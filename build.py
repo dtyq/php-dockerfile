@@ -49,6 +49,8 @@ def mian(argv0, tag, *args):
 
     mirror = publicMirror
     for m in tryMirrors:
+        if not m:
+            continue
         domain = m.removeprefix("https://").removeprefix("http://")
         try:
             socket.getaddrinfo(domain, 80)
