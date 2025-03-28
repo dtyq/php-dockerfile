@@ -147,7 +147,6 @@ def mian(argv0, tag, *args):
     print(args)
     debuggableBuild = subprocess.Popen(args=args, stdout=sys.stdout, stderr=sys.stderr)
     debuggableBuild.wait()
-    debuggableBuild.wait()
     if debuggableBuild.returncode != 0:
         raise Exception("构建有符号版本失败")
     print("构建有符号（镜像比较大，调试/带符号生产用）版本")
@@ -164,6 +163,10 @@ def mian(argv0, tag, *args):
     # wait for done
     strippedPush.wait()
     debuggablePush.wait()
+    if strippedPush.returncode != 0:
+        raise Exception("上传无符号版本失败")
+    if debuggablePush.returncode != 0:
+        raise Exception("上传有符号版本失败")
 
 
 if __name__ == "__main__":
