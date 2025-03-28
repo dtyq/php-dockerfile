@@ -16,8 +16,9 @@ RUN set -eo pipefail ; \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.3-edge"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
-        "8.2-edge"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
+        "8.4-edge"|"8.4-3.21") suffix=84;; \
+        "8.3-edge"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
+        "8.2-edge"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
         "8.1-edge"|"8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
         "8.0-3.16"|"8.0-3.15") suffix=8;; \
         "7.4-3.15") suffix=7;; \
@@ -105,8 +106,9 @@ RUN set -eo pipefail; \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.3-edge"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
-        "8.2-edge"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
+        "8.4-edge"|"8.4-3.21") suffix=84;; \
+        "8.3-edge"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
+        "8.2-edge"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
         "8.1-edge"|"8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
         "8.0-3.16"|"8.0-3.15") suffix=8;; \
         "7.4-3.15") suffix=7;; \
@@ -233,8 +235,9 @@ COPY exts /usr/src/exts/
 RUN set -eo pipefail && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.3-edge"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
-        "8.2-edge"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
+        "8.4-edge"|"8.4-3.21") suffix=84;; \
+        "8.3-edge"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
+        "8.2-edge"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
         "8.1-edge"|"8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
         "8.0-3.16"|"8.0-3.15") suffix=8;; \
         "7.4-3.15") suffix=7;; \
