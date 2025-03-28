@@ -29,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tasks: ${{ steps.gentasks.outputs.tasks }}
+      images: ${{ steps.gentasks.outputs.images }}
     steps:
       - name: Generate tasks
         shell: python3 {0}
@@ -60,6 +61,8 @@ jobs:
           ]
           extraExtTag = "-".join(sorted(extraExts))
 
+          githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
+
           tags = []
           for phpVer, alpineVer in phpAlpineVersions.items():
             for ext in extVersions:
@@ -74,6 +77,12 @@ jobs:
                 continue
               tags.append(f"{phpVer}-alpine-{alpineVer}-{ext}-{extraExtTag}")
 
+          serialized = json.dumps({
+            "tag": tags,
+          })
+
+          githubOutput.write(f"tasks={serialized}\n")
+
           images = []
           images.append(f"${{ inputs.ghcrImageName }}")
           if "${{ secrets.DOCKERHUB_CRED }}":
@@ -81,15 +90,13 @@ jobs:
           if "${{ secrets.AWS_ECR_CRED }}":
             images.append(f"${{ inputs.awsEcrImageName }}")
 
-          serialized = json.dumps({
-            "image": images,
-            "tag": tags,
-          })
+          serialized = json.dumps(images)
 
-          open(os.environ["GITHUB_OUTPUT"], "w").write(f"tasks={serialized}")
+          githubOutput.write(f"images={serialized}\n")
+          githubOutput.close()
 
   build:
-    name: Build and push images
+    name: Build and push ${{ matrix.tag }}
     runs-on: ubuntu-latest
     needs: prepare
     strategy:
@@ -116,55 +123,56 @@ jobs:
             "auths": {},
           }
 
-          if "${{ matrix.image }}".startswith("ghcr.io"):
-            # GHCR
-            cred = base64.b64encode(b'whatever:${{ github.token }}').decode()
-            config["auths"]["ghcr.io"] = {
-              "auth": cred,
-            }
-          elif "${{ matrix.image }}".startswith("public.ecr.aws"):
-            cred = "${{ secrets.AWS_ECR_CRED }}"
-            if not cred:
-              print("Set AWS_ECR_CRED secret in repository settings, then re-run this workflow")
-              raise Exception("AWS_ECR_CRED is not set")
+          # GHCR
+          cred = base64.b64encode(b'whatever:${{ github.token }}').decode()
+          config["auths"]["ghcr.io"] = {
+            "auth": cred,
+          }
+
+          # AWS ECR
+          cred = "${{ secrets.AWS_ECR_CRED }}"
+          if cred:
             config["auths"]["public.ecr.aws"] = {
               "auth": cred,
             }
-          else:
-            # DockerHub
-            cred = "${{ secrets.DOCKERHUB_CRED }}"
-            if not cred:
-              print("Set DOCKERHUB_CRED secret in repository settings, then re-run this workflow")
-              raise Exception("DOCKERHUB_CRED is not set")
-            config["auths"]["docker.io"] = {
+
+          # DockerHub
+          cred = "${{ secrets.DOCKERHUB_CRED }}"
+          if cred:
+            config["auths"]["https://index.docker.io/v1/"] = {
               "auth": cred,
             }
 
           fw.write(json.dumps(config))
           fw.close()
 
-      - name: Build
+      - name: Build image
         shell: bash
         id: build
         run: |
-          export IMAGE_NAME="${{ matrix.image }}"
-          ./build.py "${{ matrix.tag }}"
-      
-      - name: Get image digest
-        id: digest
-        shell: bash
-        run: |
-          digest=$(
-            docker image inspect "${{ matrix.image }}:${{ matrix.tag }}" --format '{{index .RepoDigests 0}}' |
-            awk '-F@' '{print $2}'
-          )
+          IMAGE_NAME=php-dockerfile ./build.py "${{ matrix.tag }}"
 
+      - name: Push image
+        shell: bash
+        id: push
+        run: |
+          echo '${{ needs.prepare.outputs.images }}' | jq -r '.[]' | while read image; do
+            docker tag php-dockerfile:${{ matrix.tag }} "$image:${{ matrix.tag }}"
+            docker tag php-dockerfile:${{ matrix.tag }}-debuggable "$image:${{ matrix.tag }}-debuggable"
+            docker push "$image:${{ matrix.tag }}"
+            docker push "$image:${{ matrix.tag }}-debuggable"
+
+            digest=$(
+              docker image inspect "$image:${{ matrix.tag }}" --format '{{index .RepoDigests 0}}' |
+              awk '-F@' '{print $2}'
+            )
+          done
           echo "digest=${digest}" >> $GITHUB_OUTPUT
 
       - name: Generate artifact attestation
-        if: steps.digest.outputs.digest != ''
+        if: always() && steps.push.outputs.digest != ''
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: "${{ matrix.image }}:${{ matrix.tag }}"
-          subject-digest: ${{ steps.digest.outputs.digest }}
-          push-to-registry: true
+          subject-name: ${{ matrix.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: ${{ matrix.image }}
