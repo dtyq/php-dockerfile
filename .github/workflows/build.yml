@@ -99,6 +99,7 @@ jobs:
       contents: write
       packages: write
       id-token: write
+      attestations: write
     steps:
       # checkout source code
       - name: Checkout
@@ -144,7 +145,26 @@ jobs:
 
       - name: Build
         shell: bash
+        id: build
         run: |
           export IMAGE_NAME="${{ matrix.image }}"
           ./build.py "${{ matrix.tag }}"
+      
+      - name: Get image digest
+        id: digest
+        shell: bash
+        run: |
+          digest=$(
+            docker image inspect "${{ matrix.image }}:${{ matrix.tag }}" --format '{{index .RepoDigests 0}}' |
+            awk '-F@' '{print $2}'
+          )
 
+          echo "digest=${digest}" >> $GITHUB_OUTPUT
+
+      - name: Generate artifact attestation
+        if: steps.digest.outputs.digest != ''
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: "${{ matrix.image }}:${{ matrix.tag }}"
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
