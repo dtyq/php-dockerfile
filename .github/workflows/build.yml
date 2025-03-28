@@ -95,6 +95,10 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.tasks) }}
       max-parallel: 5
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     steps:
       # checkout source code
       - name: Checkout
