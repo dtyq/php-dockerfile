@@ -84,11 +84,11 @@ jobs:
           githubOutput.write(f"tasks={serialized}\n")
 
           images = []
-          images.append(f"${{ inputs.ghcrImageName }}")
+          images.append("${{ inputs.ghcrImageName }}" or "dtyq/php-dockerfile")
           if "${{ secrets.DOCKERHUB_CRED }}":
-            images.append(f"${{ inputs.dockerhubImageName }}")
+            images.append("${{ inputs.dockerhubImageName }}" or "ghcr.io/dtyq/php-dockerfile")
           if "${{ secrets.AWS_ECR_CRED }}":
-            images.append(f"${{ inputs.awsEcrImageName }}")
+            images.append("${{ inputs.awsEcrImageName }}" or "public.ecr.aws/dtyq/php-dockerfile")
 
           serialized = json.dumps(images)
 
