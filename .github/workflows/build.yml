@@ -22,6 +22,7 @@ on:
 env:
   TRY_MIRRORS: ""
   PUBLIC_MIRROR: "https://dl-cdn.alpinelinux.org" # no mirror needed at github actions
+  IMAGE_NAME: php-dockerfile # only used for default local image name
 
 jobs:
   prepare:
@@ -30,6 +31,7 @@ jobs:
     outputs:
       tasks: ${{ steps.gentasks.outputs.tasks }}
       images: ${{ steps.gentasks.outputs.images }}
+      outputs: ${{ steps.gentasks.outputs.outputs }}
     steps:
       - name: Generate tasks
         shell: python3 {0}
@@ -64,6 +66,7 @@ jobs:
           githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
 
           tags = []
+          index = 0
           for phpVer, alpineVer in phpAlpineVersions.items():
             for ext in extVersions:
               if ext.startswith("swoole-5") and phpVer == "7.4":
@@ -75,12 +78,14 @@ jobs:
               if ext.startswith("swow") and phpVer == "7.4":
                 # swow 不支持 PHP 7.4
                 continue
-              tags.append(f"{phpVer}-alpine-{alpineVer}-{ext}-{extraExtTag}")
+              tag = f"{phpVer}-alpine-{alpineVer}-{ext}-{extraExtTag}"
+              tags.append({
+                "tag": tag,
+                "outputVar": f"output{index}",
+              })
+              index += 1
 
-          serialized = json.dumps({
-            "tag": tags,
-          })
-
+          serialized = json.dumps({"tag": tags})
           githubOutput.write(f"tasks={serialized}\n")
 
           images = []
@@ -91,12 +96,12 @@ jobs:
             images.append("${{ inputs.awsEcrImageName }}" or "public.ecr.aws/dtyq/php-dockerfile")
 
           serialized = json.dumps(images)
-
           githubOutput.write(f"images={serialized}\n")
+
           githubOutput.close()
 
   build:
-    name: Build and push ${{ matrix.tag }}
+    name: ${{ matrix.tag.tag }} build and push
     runs-on: ubuntu-latest
     needs: prepare
     strategy:
@@ -105,8 +110,29 @@ jobs:
     permissions:
       contents: write
       packages: write
-      id-token: write
-      attestations: write
+    # NOTE: needs more if more output var added
+    # this is dumb, but we cannot generate dynamic outputs via needs.prepare.outputs.outputs
+    outputs:
+      output1: ${{ steps.push.outputs.output1 }}
+      output2: ${{ steps.push.outputs.output2 }}
+      output3: ${{ steps.push.outputs.output3 }}
+      output4: ${{ steps.push.outputs.output4 }}
+      output5: ${{ steps.push.outputs.output5 }}
+      output6: ${{ steps.push.outputs.output6 }}
+      output7: ${{ steps.push.outputs.output7 }}
+      output8: ${{ steps.push.outputs.output8 }}
+      output9: ${{ steps.push.outputs.output9 }}
+      output10: ${{ steps.push.outputs.output10 }}
+      output11: ${{ steps.push.outputs.output11 }}
+      output12: ${{ steps.push.outputs.output12 }}
+      output13: ${{ steps.push.outputs.output13 }}
+      output14: ${{ steps.push.outputs.output14 }}
+      output15: ${{ steps.push.outputs.output15 }}
+      output16: ${{ steps.push.outputs.output16 }}
+      output17: ${{ steps.push.outputs.output17 }}
+      output18: ${{ steps.push.outputs.output18 }}
+      output19: ${{ steps.push.outputs.output19 }}
+      output20: ${{ steps.push.outputs.output20 }}
     steps:
       # checkout source code
       - name: Checkout
@@ -150,44 +176,111 @@ jobs:
         shell: bash
         id: build
         run: |
-          IMAGE_NAME=php-dockerfile ./build.py "${{ matrix.tag }}"
+          ./build.py "${{ matrix.tag.tag }}"
 
       - name: Push image
-        shell: bash
+        shell: python {0}
         id: push
         run: |
-          echo '${{ needs.prepare.outputs.images }}' | jq -r '.[]' | while read image; do
-            docker tag php-dockerfile:${{ matrix.tag }} "$image:${{ matrix.tag }}"
-            docker tag php-dockerfile:${{ matrix.tag }}-debuggable "$image:${{ matrix.tag }}-debuggable"
-            docker push "$image:${{ matrix.tag }}"
-            docker push "$image:${{ matrix.tag }}-debuggable"
+          import sys, os, json, subprocess
 
-            digest_main=$(
-              docker image inspect "$image:${{ matrix.tag }}" --format '{{index .RepoDigests 0}}' |
-              awk '-F@' '{print $2}'
-            )
-            digest_debuggable=$(
-              docker image inspect "$image:${{ matrix.tag }}-debuggable" --format '{{index .RepoDigests 0}}' |
-              awk '-F@' '{print $2}'
-            )
-          done
-          echo "got $image:${{ matrix.tag }} ${digest_main}"
-          echo "got $image:${{ matrix.tag }}-debuggable ${digest_debuggable}"
-          echo "digest_main=${digest_main}" >> $GITHUB_OUTPUT
-          echo "digest_debuggable=${digest_debuggable}" >> $GITHUB_OUTPUT
+          imageName = os.environ["IMAGE_NAME"]
+          images = json.loads('${{ needs.prepare.outputs.images }}')
+          digests = {}
+          for image in images:
+            for tag in ("${{ matrix.tag.tag }}", "${{ matrix.tag.tag }}-debuggable"):
+              print(f"tagging {imageName}:{tag} to {image}:{tag}")
+              proc = subprocess.run(
+                ["docker", "tag", f"{imageName}:{tag}", f"{image}:{tag}"]
+              )
+              if proc.returncode != 0:
+                print(f"failed to tag {imageName}:{tag} to {image}:{tag}")
+                sys.exit(1)
 
-      - name: Generate artifact attestation for main image
-        if: steps.push.outputs.digest_main != ''
+              print(f"pushing {image}:{tag}")
+              proc = subprocess.run(["docker", "push", f"{image}:{tag}"])
+              if proc.returncode != 0:
+                print(f"failed to push {image}:{tag}")
+                sys.exit(1)
+
+              print(f"get {image}:{tag} digest")
+              proc = subprocess.run(
+                [
+                  "docker",
+                  "inspect",
+                  f"{image}:{tag}",
+                  "--format",
+                  "{{index .RepoDigests 0}}",
+                ],
+                capture_output=True,
+              )
+              if proc.returncode != 0:
+                print(f"failed to inspect {image}:{tag}")
+                sys.exit(1)
+
+              digest = proc.stdout.decode().strip().split("@")[1]
+              if digest:
+                print(f"got {image}:{tag} digest: {digest}")
+              else:
+                print(f"failed to get {image}:{tag} digest")
+                sys.exit(1)
+
+              digests[f"{image}:{tag}"] = digest
+
+          githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
+          githubOutput.write(f"${{ matrix.tag.outputVar }}={json.dumps(digests)}\n")
+          githubOutput.close()
+
+  gen-attests:
+    name: Generate attestation jobs
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      tasks: ${{ steps.gen-attests.outputs.tasks }}
+    steps:
+      - name: Duplicate json
+        shell: cp {0} ./attests.json
+        run: |
+          ${{ toJson(needs.build.outputs) }}
+
+      - name: Generate attestation jobs
+        shell: python3 {0}
+        id: gen-attests
+        run: |
+          import json, os
+          hashes = json.load(open("./attests.json"))
+
+          attests = []
+
+          for _, content in hashes.items():
+            for image, digest in json.loads(content).items():
+              attests.append({
+                "image": image,
+                "digest": digest,
+              })
+
+          serialized = json.dumps({"attests": attests})
+          print(serialized)
+          githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
+          githubOutput.write(f"tasks={serialized}\n")
+          githubOutput.close()
+
+  attest:
+    name: ${{ matrix.attests.image }} artifact attestation
+    runs-on: ubuntu-latest
+    needs: gen-attests
+    strategy:
+      matrix: ${{ fromJson(needs.gen-attests.outputs.tasks) }}
+      max-parallel: 10
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ${{ matrix.image }}
-          subject-digest: ${{ steps.push.outputs.digest_main }}
-          push-to-registry: ${{ matrix.image }}
-      
-      - name: Generate artifact attestation for debuggable image
-        if: steps.push.outputs.digest_debuggable != ''
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-name: ${{ matrix.image }}
-          subject-digest: ${{ steps.push.outputs.digest_debuggable }}
-          push-to-registry: ${{ matrix.image }}
+          subject-name: ${{ matrix.attests.image }}
+          subject-digest: ${{ matrix.attests.digest }}
+          push-to-registry: ${{ matrix.attests.image }}
