@@ -249,13 +249,20 @@ jobs:
         run: |
           import json, os
           hashes = json.load(open("./attests.json"))
-
-          attests = []
+          
+          imageDigests = {}
 
           for _, content in hashes.items():
             for image, digest in json.loads(content).items():
+              imageName = image.split(":")[0]
+              imageDigests[imageName] = imageDigests.get(imageName, [])
+              imageDigests[imageName].append(digest)
+
+          attests = []
+          for imageName, digests in imageDigests.items():
+            for digest in digests:
               attests.append({
-                "image": image.split(":")[0],
+                "image": imageName,
                 "digest": digest,
               })
 
