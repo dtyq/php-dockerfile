@@ -162,17 +162,32 @@ jobs:
             docker push "$image:${{ matrix.tag }}"
             docker push "$image:${{ matrix.tag }}-debuggable"
 
-            digest=$(
+            digest_main=$(
               docker image inspect "$image:${{ matrix.tag }}" --format '{{index .RepoDigests 0}}' |
               awk '-F@' '{print $2}'
             )
+            digest_debuggable=$(
+              docker image inspect "$image:${{ matrix.tag }}-debuggable" --format '{{index .RepoDigests 0}}' |
+              awk '-F@' '{print $2}'
+            )
           done
-          echo "digest=${digest}" >> $GITHUB_OUTPUT
+          echo "got $image:${{ matrix.tag }} ${digest_main}"
+          echo "got $image:${{ matrix.tag }}-debuggable ${digest_debuggable}"
+          echo "digest_main=${digest_main}" >> $GITHUB_OUTPUT
+          echo "digest_debuggable=${digest_debuggable}" >> $GITHUB_OUTPUT
 
-      - name: Generate artifact attestation
-        if: always() && steps.push.outputs.digest != ''
+      - name: Generate artifact attestation for main image
+        if: steps.push.outputs.digest_main != ''
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ matrix.image }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.push.outputs.digest_main }}
+          push-to-registry: ${{ matrix.image }}
+      
+      - name: Generate artifact attestation for debuggable image
+        if: steps.push.outputs.digest_debuggable != ''
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ matrix.image }}
+          subject-digest: ${{ steps.push.outputs.digest_debuggable }}
           push-to-registry: ${{ matrix.image }}
