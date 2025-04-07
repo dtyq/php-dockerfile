@@ -284,6 +284,40 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - name: Set up secrets
+        shell: python3 {0}
+        run: |
+          import os, json, base64
+
+          fw = open(os.path.expanduser("~/.docker/config.json"), "w")
+
+          config = {
+            "auths": {},
+          }
+
+          # GHCR
+          cred = base64.b64encode(b'whatever:${{ github.token }}').decode()
+          config["auths"]["ghcr.io"] = {
+            "auth": cred,
+          }
+
+          # AWS ECR
+          cred = "${{ secrets.AWS_ECR_CRED }}"
+          if cred:
+            config["auths"]["public.ecr.aws"] = {
+              "auth": cred,
+            }
+
+          # DockerHub
+          cred = "${{ secrets.DOCKERHUB_CRED }}"
+          if cred:
+            config["auths"]["https://index.docker.io/v1/"] = {
+              "auth": cred,
+            }
+
+          fw.write(json.dumps(config))
+          fw.close()
+
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
