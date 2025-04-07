@@ -255,12 +255,11 @@ jobs:
           for _, content in hashes.items():
             for image, digest in json.loads(content).items():
               attests.append({
-                "image": image,
+                "image": image.split(":")[0],
                 "digest": digest,
               })
 
           serialized = json.dumps({"attests": attests})
-          print(serialized)
           githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
           githubOutput.write(f"tasks={serialized}\n")
           githubOutput.close()
@@ -283,4 +282,4 @@ jobs:
         with:
           subject-name: ${{ matrix.attests.image }}
           subject-digest: ${{ matrix.attests.digest }}
-          push-to-registry: ${{ matrix.attests.image }}
+          push-to-registry: true
