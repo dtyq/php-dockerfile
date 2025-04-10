@@ -3,7 +3,7 @@
 import os, sys, re, subprocess, socket
 
 tagRe = re.compile(
-    r"^(?P<phpver>\d\.\d)-alpine-(?P<alpinever>(?:\d\.\d+|edge))-(?P<ext>swow|swoole)-(?P<extver>\d+\.\d+\.\d+(?:-alpha(?:\.\d+)*)*(?:-nightly\d+)*)(?P<exts>(?:-[^-]+)*)$"
+    r"^(?P<phpver>\d\.\d)-alpine-(?P<alpinever>(?:\d\.\d+|edge))-(?P<ext>swow|swoole)-(?P<extver>\d+\.\d+\.\d+(?:-alpha(?:\.\d+)*)*(?:-nightly\d+)*|ci|master)(?P<exts>(?:-[^-]+)*)$"
 )
 
 imageName = os.environ.get("IMAGE_NAME")
@@ -37,12 +37,22 @@ def mian(argv0, tag, *args):
             raise Exception(f"不支持的附加扩展{ext}，联系这个仓库的维护者")
 
     if groups["ext"] == "swoole":
-        extUrl = (
-            f"https://github.com/swoole/swoole-src/archive/v{groups['extver']}.tar.gz"
-        )
+        if groups["extver"] == "ci":
+            raise Exception("swoole不使用ci分支")
+        elif groups["extver"] == "master":
+            extUrl = "https://github.com/swoole/swoole-src/archive/refs/heads/master.tar.gz"
+        else:
+            extUrl = (
+                f"https://github.com/swoole/swoole-src/archive/v{groups['extver']}.tar.gz"
+            )
         extDev = f"libpq-dev c-ares-dev curl-dev openssl-dev libstdc++"
     elif groups["ext"] == "swow":
-        extUrl = f"https://github.com/swow/swow/archive/v{groups['extver']}.tar.gz"
+        if groups["extver"] == "master":
+            raise Exception("swow不使用master分支")
+        elif groups["extver"] == "ci":
+            extUrl = "https://github.com/swow/swow/archive/refs/heads/ci.tar.gz"
+        else:
+            extUrl = f"https://github.com/swow/swow/archive/v{groups['extver']}.tar.gz"
         extDev = f"libpq-dev curl-dev openssl-dev"
     else:
         raise Exception("not implemented")
