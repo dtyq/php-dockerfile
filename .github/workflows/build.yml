@@ -46,7 +46,6 @@ jobs:
             "8.2": "3.21",
             "8.1": "3.18",
             "8.0": "3.16",
-            "7.4": "3.15",
           }
 
           extVersions = [
@@ -57,7 +56,7 @@ jobs:
             # swoole 5.1 branch
             ("swoole-5.1.7", "8.0", "8.3"),
             # swoole 4.8 branch
-            ("swoole-4.8.13", "7.4", "8.2"),
+            ("swoole-4.8.13", "8.0", "8.2"),
             # swow ci branch
             ("swow-ci", "8.0", None),
             # swow
