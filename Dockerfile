@@ -3,7 +3,7 @@
 
 ARG ALPINE_VERSION
 
-FROM alpine:$ALPINE_VERSION as php_base
+FROM alpine:$ALPINE_VERSION AS php_base
 
 ARG ALPINE_VERSION
 ARG PHP_VERSION
@@ -11,7 +11,8 @@ ARG EXT_DEV
 ARG MIRROR
 ARG CURL_PROXY
 
-RUN set -eo pipefail ; \
+RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
+    set -eo pipefail ; \
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
     # setup suffix
@@ -91,7 +92,7 @@ RUN set -eo pipefail ; \
     printf "\033[42;37m Build Completed :).\033[0m\n"
     
 
-FROM php_base as ext_builder
+FROM php_base AS ext_builder
 
 ARG ALPINE_VERSION
 ARG PHP_VERSION
@@ -101,7 +102,8 @@ ARG EXT_DEV
 ARG CURL_PROXY
 
 # build extension
-RUN set -eo pipefail; \
+RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
+    set -eo pipefail; \
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
     # setup suffix
@@ -224,7 +226,7 @@ RUN set -eo pipefail; \
     printf "\033[42;37m Built ${EXT} is \033[0m\n" && \
     php -dextension=/usr/src/${EXT_DIR}/.libs/${EXT}.so --ri ${EXT}
 
-FROM ext_builder as exts_builder
+FROM ext_builder AS exts_builder
 
 ARG ALPINE_VERSION
 ARG PHP_VERSION
@@ -232,7 +234,8 @@ ARG EXTS
 
 COPY exts /usr/src/exts/
 
-RUN set -eo pipefail && \
+RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
+    set -eo pipefail && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
         "8.4-edge"|"8.4-3.21") suffix=84;; \
@@ -252,10 +255,10 @@ RUN set -eo pipefail && \
         IFS="$_IFS" "/usr/src/exts/${ext}.sh" ; \
     done
 
-FROM php_base as stripped
+FROM php_base AS stripped
 
 COPY --from=exts_builder /tmp/stripped /
 
-FROM php_base as debuggable
+FROM php_base AS debuggable
 
 COPY --from=exts_builder /tmp/withdebug /
