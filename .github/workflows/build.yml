@@ -86,6 +86,7 @@ jobs:
                 "tag": tag,
                 "outputVar": f"output{index}",
               })
+              print(f"Add tag {tag}")
               index += 1
 
           serialized = json.dumps({"tag": tags})
@@ -136,6 +137,16 @@ jobs:
       output18: ${{ steps.push.outputs.output18 }}
       output19: ${{ steps.push.outputs.output19 }}
       output20: ${{ steps.push.outputs.output20 }}
+      output21: ${{ steps.push.outputs.output21 }}
+      output22: ${{ steps.push.outputs.output22 }}
+      output23: ${{ steps.push.outputs.output23 }}
+      output24: ${{ steps.push.outputs.output24 }}
+      output25: ${{ steps.push.outputs.output25 }}
+      output26: ${{ steps.push.outputs.output26 }}
+      output27: ${{ steps.push.outputs.output27 }}
+      output28: ${{ steps.push.outputs.output28 }}
+      output29: ${{ steps.push.outputs.output29 }}
+      output30: ${{ steps.push.outputs.output30 }}
     steps:
       # checkout source code
       - name: Checkout
