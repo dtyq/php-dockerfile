@@ -6,7 +6,7 @@ on:
       dockerhubImageName:
         description: 'dockerhub image name'
         required: true
-        default: 'docker.io/dtyq/php-dockerfile'
+        default: 'index.docker.io/dtyq/php-dockerfile'
       ghcrImageName:
         description: 'ghcr.io image name'
         required: true
@@ -95,7 +95,7 @@ jobs:
           images = []
           images.append("${{ inputs.ghcrImageName }}" or "ghcr.io/dtyq/php-dockerfile")
           if "${{ secrets.DOCKERHUB_CRED }}":
-            images.append("${{ inputs.dockerhubImageName }}" or "docker.io/dtyq/php-dockerfile")
+            images.append("${{ inputs.dockerhubImageName }}" or "index.docker.io/dtyq/php-dockerfile")
           if "${{ secrets.AWS_ECR_CRED }}":
             images.append("${{ inputs.awsEcrImageName }}" or "public.ecr.aws/dtyq/php-dockerfile")
 
