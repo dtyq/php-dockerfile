@@ -38,8 +38,10 @@ jobs:
         id: gentasks
         run: |
           import os, json
+          from distutils.version import LooseVersion
 
           phpAlpineVersions = {
+            "8.4": "3.21",
             "8.3": "3.21",
             "8.2": "3.21",
             "8.1": "3.18",
@@ -48,12 +50,18 @@ jobs:
           }
 
           extVersions = [
+            # swoole master branch
+            ("swoole-master", "8.1", None),
+            # swoole 6.0 branch
+            ("swoole-6.0.2", "8.1", None),
             # swoole 5.1 branch
-            "swoole-5.1.5",
+            ("swoole-5.1.7", "8.0", "8.3"),
             # swoole 4.8 branch
-            "swoole-4.8.13",
+            ("swoole-4.8.13", "7.4", "8.2"),
+            # swow ci branch
+            ("swow-ci", "8.0", None),
             # swow
-            "swow-1.5.3",
+            ("swow-1.5.3", "8.0", "8.3"),
           ]
 
           extraExts = [
@@ -68,15 +76,11 @@ jobs:
           tags = []
           index = 0
           for phpVer, alpineVer in phpAlpineVersions.items():
-            for ext in extVersions:
-              if ext.startswith("swoole-5") and phpVer == "7.4":
-                # swoole 5 不支持 PHP 7.4
+            for extVersion in extVersions:
+              ext, minPhpVer, maxPhpVer = extVersion
+              if minPhpVer and LooseVersion(phpVer) < LooseVersion(minPhpVer):
                 continue
-              if ext.startswith("swoole-4") and phpVer == "8.3":
-                # swoole 4 不支持 PHP 8.3
-                continue
-              if ext.startswith("swow") and phpVer == "7.4":
-                # swow 不支持 PHP 7.4
+              if maxPhpVer and LooseVersion(phpVer) > LooseVersion(maxPhpVer):
                 continue
               tag = f"{phpVer}-alpine-{alpineVer}-{ext}-{extraExtTag}"
               tags.append({
