@@ -9,7 +9,7 @@ suffix="${suffix-""}"
 EXT=parle
 EXT_DIR="${EXT}"
 CONFIGURE_ARGS=""
-URL=https://pecl.php.net/get/parle-0.8.3.tgz
+URL=https://pecl.php.net/get/parle-0.8.5.tgz
 
 printf "\033[44;37m Start build extension %s \033[0m\n" "${EXT}"
 

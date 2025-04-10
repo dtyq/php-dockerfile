@@ -9,7 +9,7 @@ suffix="${suffix-""}"
 EXT=xlswriter
 EXT_DIR="${EXT}"
 CONFIGURE_ARGS="--enable-reader"
-URL=https://pecl.php.net/get/xlswriter-1.5.2.tgz
+URL=https://pecl.php.net/get/xlswriter-1.5.8.tgz
 
 printf "\033[44;37m Start build extension %s \033[0m\n" "${EXT}"
 
