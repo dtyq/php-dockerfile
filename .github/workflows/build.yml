@@ -60,7 +60,7 @@ jobs:
             # swow ci branch
             ("swow-ci", "8.0", None),
             # swow
-            ("swow-1.6.0", "8.0", "8.4"),
+            ("swow-1.6.1", "8.0", "8.4"),
           ]
 
           extraExts = [
