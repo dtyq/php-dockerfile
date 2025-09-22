@@ -3,6 +3,10 @@ name: Build and push images
 on:
   workflow_dispatch:
     inputs:
+      runsOn:
+        description: 'runs on'
+        required: true
+        default: 'ubuntu-latest'
       dockerhubImageName:
         description: 'dockerhub image name'
         required: true
@@ -27,7 +31,7 @@ env:
 jobs:
   prepare:
     name: Prepare matrix
-    runs-on: ubuntu-latest
+    runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
     outputs:
       tasks: ${{ steps.gentasks.outputs.tasks }}
       images: ${{ steps.gentasks.outputs.images }}
@@ -106,7 +110,7 @@ jobs:
 
   build:
     name: ${{ matrix.tag.tag }} build and push
-    runs-on: ubuntu-latest
+    runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
     needs: prepare
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.tasks) }}
@@ -248,7 +252,7 @@ jobs:
 
   gen-attests:
     name: Generate attestation jobs
-    runs-on: ubuntu-latest
+    runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
     needs: build
     if: ${{ always() }}
     outputs:
@@ -291,7 +295,7 @@ jobs:
 
   attest:
     name: ${{ matrix.attests.image }} artifact attestation
-    runs-on: ubuntu-latest
+    runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
     needs: gen-attests
     strategy:
       matrix: ${{ fromJson(needs.gen-attests.outputs.tasks) }}
