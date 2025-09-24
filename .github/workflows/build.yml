@@ -198,57 +198,10 @@ jobs:
           ./build.py "${{ matrix.tag.tag }}"
 
       - name: Push image
-        shell: python {0}
+        shell: bash
         id: push
         run: |
-          import sys, os, json, subprocess
-
-          imageName = os.environ["IMAGE_NAME"]
-          images = json.loads('${{ needs.prepare.outputs.images }}')
-          digests = {}
-          for image in images:
-            for tag in ("${{ matrix.tag.tag }}", "${{ matrix.tag.tag }}-debuggable"):
-              print(f"tagging {imageName}:{tag} to {image}:{tag}")
-              proc = subprocess.run(
-                ["docker", "tag", f"{imageName}:{tag}", f"{image}:{tag}"]
-              )
-              if proc.returncode != 0:
-                print(f"failed to tag {imageName}:{tag} to {image}:{tag}")
-                sys.exit(1)
-
-              print(f"pushing {image}:{tag}")
-              proc = subprocess.run(["docker", "push", f"{image}:{tag}"])
-              if proc.returncode != 0:
-                print(f"failed to push {image}:{tag}")
-                sys.exit(1)
-
-              print(f"get {image}:{tag} digest")
-              proc = subprocess.run(
-                [
-                  "docker",
-                  "inspect",
-                  f"{image}:{tag}",
-                  "--format",
-                  "{{index .RepoDigests 0}}",
-                ],
-                capture_output=True,
-              )
-              if proc.returncode != 0:
-                print(f"failed to inspect {image}:{tag}")
-                sys.exit(1)
-
-              digest = proc.stdout.decode().strip().split("@")[1]
-              if digest:
-                print(f"got {image}:{tag} digest: {digest}")
-              else:
-                print(f"failed to get {image}:{tag} digest")
-                sys.exit(1)
-
-              digests[f"{image}:{tag}"] = digest
-
-          githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
-          githubOutput.write(f"${{ matrix.tag.outputVar }}={json.dumps(digests)}\n")
-          githubOutput.close()
+          ./.github/workflows/pushimage.py '${{ matrix.tag.tag }}' '${{ needs.prepare.outputs.images }}'
 
   gen-attests:
     name: Generate attestation jobs
