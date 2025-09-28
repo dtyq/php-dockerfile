@@ -29,7 +29,7 @@ The debuggable version of the image contains source code and debug symbols, for 
 ### Build
 
 ```bash
-IMAGE_NAME=some-registry.domain/some-namespace/some-image-name ./build.py "<tag>"
+./build.py <tag> [--export-to-oci] [--image-name=<IMAGE_NAME>] [--push]
 ```
 
 Where `IMAGE_NAME` is the image name, for example `ghcr.io/myorg/php-dockerfile`

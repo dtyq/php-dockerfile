@@ -1,15 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-import os, sys, re, subprocess, socket, urllib.request, json
+import os
+import sys
+import re
+import subprocess
+import socket
+import urllib.request
+import json
+import argparse
 
 tagRe = re.compile(
     r"^(?P<phpver>\d\.\d)-alpine-(?P<alpinever>(?:\d\.\d+|edge))-(?P<ext>swow|swoole)-(?P<extver>\d+\.\d+\.\d+(?:-alpha(?:\.\d+)*)*(?:-nightly\d+)*|ci|master)(?P<exts>(?:-[^-]+)*)$"
 )
-
-imageName = os.environ.get("IMAGE_NAME")
-
-if not imageName:
-    raise Exception("IMAGE_NAME 环境变量未设置")
 
 tryMirrors = os.environ.get(
     "TRY_MIRRORS", "http://mirrors.cloud.aliyuncs.com,http://mirrors.tencentyun.com"
@@ -41,10 +43,22 @@ def getHEADRev(repo: str, branch: str) -> str:
         return data["sha"]
 
 
-def mian(argv0, tag, *args):
-    match = tagRe.match(tag)
+def mian():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("TAG", help="tag, see README.md for tag naming convention")
+    parser.add_argument("IMAGE_NAMES", nargs="+", help="image names")
+    parser.add_argument("--oci", action="store_true", help="export to oci format")
+    parser.add_argument("--gen-metadata", help="generate metadata", action="store_true")
+    parser.add_argument("--push", action="store_true", help="push to registry")
+    parser.add_argument("--arch-suffix", action="store_true", help="add arch suffix to image name")
+    args = parser.parse_args()
+
+    tag = args.TAG
+    match = tagRe.match(args.TAG)
     if not match:
-        raise Exception(f"错误的tag格式，用法：{argv0} <tag>")
+        raise Exception(
+            f"错误的tag格式"
+        )
 
     groups = match.groupdict()
     if groups["exts"]:
@@ -65,7 +79,7 @@ def mian(argv0, tag, *args):
             extRev = getHEADRev("swoole/swoole-src", "master")
             extUrl = f"https://github.com/swoole/swoole-src/archive/{extRev}.tar.gz"
         else:
-            extRev = getHEADRev("swoole/swoole-src", groups['extver'])
+            extRev = getHEADRev("swoole/swoole-src", groups["extver"])
             extUrl = f"https://github.com/swoole/swoole-src/archive/v{groups['extver']}.tar.gz"
         extDev = f"libpq-dev c-ares-dev curl-dev openssl-dev libstdc++"
     elif groups["ext"] == "swow":
@@ -75,7 +89,7 @@ def mian(argv0, tag, *args):
             extRev = getHEADRev("swow/swow", "ci")
             extUrl = f"https://github.com/swow/swow/archive/{extRev}.tar.gz"
         else:
-            extRev = getHEADRev("swow/swow", 'v' + groups['extver'])
+            extRev = getHEADRev("swow/swow", "v" + groups["extver"])
             extUrl = f"https://github.com/swow/swow/archive/v{groups['extver']}.tar.gz"
         extDev = f"libpq-dev curl-dev openssl-dev"
     else:
@@ -97,7 +111,18 @@ def mian(argv0, tag, *args):
     proxy = os.getenv("https_proxy") or ""
     print(f"proxy={proxy}")
 
-    fullTag = f"{imageName}:{tag}"
+    dockerArch = {
+        "x86_64": "amd64",
+        "aarch64": "arm64",
+    }[os.uname().machine]
+
+    fullTagArgs = []
+    for imageName in args.IMAGE_NAMES:
+        fullTagArgs.append(f"-t")
+        if args.arch_suffix:
+            fullTagArgs.append(f"{imageName}:{tag}-{dockerArch}")
+        else:
+            fullTagArgs.append(f"{imageName}:{tag}")
 
     if groups["exts"]:
         extsBuildArg = (
@@ -107,15 +132,17 @@ def mian(argv0, tag, *args):
     else:
         extsBuildArg = ()
 
+    if os.getenv("CI"):
+        print("##[group]", end="")
     print("构建无符号（镜像比较小，生产用）版本")
-    args = [
+    cmd = [
         "docker",
         "buildx",
         "build",
-        "-t",
-        fullTag,
-        "--metadata-file",
-        "metadata_stripped.json",
+        *fullTagArgs,
+        *(("--output=type=oci,dest=/dev/null",) if args.oci else ()),
+        *(("--push",) if args.push else ("--load",)),
+        *(("--metadata-file=metadata_stripped.json",) if args.gen_metadata else ()),
         "--pull",
         "--no-cache",
         "--force-rm",
@@ -139,23 +166,36 @@ def mian(argv0, tag, *args):
         *extsBuildArg,
         ".",
     ]
-    print(args)
-    strippedBuild = subprocess.Popen(args=args, stdout=sys.stdout, stderr=sys.stderr)
+    print(cmd)
+    strippedBuild = subprocess.Popen(args=cmd, stdout=sys.stdout, stderr=sys.stderr)
     strippedBuild.wait()
     if strippedBuild.returncode != 0:
         raise Exception("构建无符号版本失败")
 
+    if os.getenv("CI"):
+        print("##[endgroup]")
+
+    fullTagArgs = []
+    for imageName in args.IMAGE_NAMES:
+        fullTagArgs.append(f"-t")
+        if args.arch_suffix:
+            fullTagArgs.append(f"{imageName}:{tag}-debuggable-{dockerArch}")
+        else:
+            fullTagArgs.append(f"{imageName}:{tag}-debuggable")
+
+    if os.getenv("CI"):
+        print("##[group]", end="")
     print("构建有符号（镜像比较大，调试/带符号生产用）版本")
-    args = [
+    cmd = [
         "docker",
         "buildx",
         "build",
-        "-t",
-        f"{fullTag}-debuggable",
+        *fullTagArgs,
+        *(("--output=type=oci,dest=/dev/null",) if args.oci else ()),
+        *(("--push",) if args.push else ("--load",)),
+        *(("--metadata-file=metadata_debuggable.json",) if args.gen_metadata else ()),
         # "--pull",
         # "--no-cache",
-        "--metadata-file",
-        "metadata_debuggable.json",
         "--force-rm",
         "--progress=plain",
         "--target",
@@ -177,12 +217,14 @@ def mian(argv0, tag, *args):
         *extsBuildArg,
         ".",
     ]
-    print(args)
-    debuggableBuild = subprocess.Popen(args=args, stdout=sys.stdout, stderr=sys.stderr)
+    print(cmd)
+    debuggableBuild = subprocess.Popen(args=cmd, stdout=sys.stdout, stderr=sys.stderr)
     debuggableBuild.wait()
     if debuggableBuild.returncode != 0:
         raise Exception("构建有符号版本失败")
 
+    if os.getenv("CI"):
+        print("##[endgroup]")
 
 if __name__ == "__main__":
-    exit(mian(*sys.argv))
+    exit(mian())

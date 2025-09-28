@@ -4,21 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       runsOn:
-        description: 'runs on'
-        required: true
-        default: 'ubuntu-latest'
+        description: 'runs on, default is ubuntu-latest'
       dockerhubImageName:
-        description: 'dockerhub image name'
-        required: true
-        default: 'index.docker.io/dtyq/php-dockerfile'
+        description: 'dockerhub image name, default is dockerhub repository slug, needs start with index.docker.io/'
       ghcrImageName:
-        description: 'ghcr.io image name'
-        required: true
-        default: 'ghcr.io/dtyq/php-dockerfile'
+        description: 'ghcr.io image name, default is github repository slug, needs start with ghcr.io/'
       awsEcrImageName:
-        description: 'AWS ECR image name'
-        required: true
-        default: 'public.ecr.aws/dtyq/php-dockerfile'
+        description: 'AWS ECR image name, defaule is aws ecr repository slug, needs start with public.ecr.aws/'
   schedule:
     # every Wednesday at 3:42 AM(UTC, Beijing time: 11:42 AM)
     - cron:  '42 3 * * 3'
@@ -26,14 +18,13 @@ on:
 env:
   TRY_MIRRORS: ""
   PUBLIC_MIRROR: "https://dl-cdn.alpinelinux.org" # no mirror needed at github actions
-  IMAGE_NAME: php-dockerfile # only used for default local image name
 
 jobs:
   prepare:
     name: Prepare matrix
-    runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
+    runs-on: 'ubuntu-latest'
     outputs:
-      tasks: ${{ steps.gentasks.outputs.tasks }}
+      tags: ${{ steps.gentasks.outputs.tags }}
       images: ${{ steps.gentasks.outputs.images }}
       outputs: ${{ steps.gentasks.outputs.outputs }}
     steps:
@@ -86,82 +77,64 @@ jobs:
               if maxPhpVer and LooseVersion(phpVer) > LooseVersion(maxPhpVer):
                 continue
               tag = f"{phpVer}-alpine-{alpineVer}-{ext}-{extraExtTag}"
-              tags.append({
-                "tag": tag,
-                "outputVar": f"output{index}",
-              })
+              tags.append(tag)
               print(f"Add tag {tag}")
               index += 1
 
-          serialized = json.dumps({"tag": tags})
-          githubOutput.write(f"tasks={serialized}\n")
+          serialized = json.dumps(tags)
+          print(f"generated matrix: {serialized}")
+          githubOutput.write(f"tags={serialized}\n")
 
           images = []
-          images.append("${{ inputs.ghcrImageName }}" or "ghcr.io/dtyq/php-dockerfile")
+          images.append("${{ inputs.ghcrImageName }}" or "ghcr.io/${{ github.repository }}")
           if "${{ secrets.DOCKERHUB_CRED }}":
-            images.append("${{ inputs.dockerhubImageName }}" or "index.docker.io/dtyq/php-dockerfile")
+            images.append("${{ inputs.dockerhubImageName }}" or "index.docker.io/${{ github.repository }}")
           if "${{ secrets.AWS_ECR_CRED }}":
-            images.append("${{ inputs.awsEcrImageName }}" or "public.ecr.aws/dtyq/php-dockerfile")
+            images.append("${{ inputs.awsEcrImageName }}" or "public.ecr.aws/${{ github.repository }}")
 
-          serialized = json.dumps(images)
-          githubOutput.write(f"images={serialized}\n")
+          imagesString = " ".join(images)
+          githubOutput.write(f"images={imagesString}\n")
 
           githubOutput.close()
 
   build:
-    name: ${{ matrix.tag.tag }} build and push
+    name: ${{ matrix.tag }} build and push
     runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
     needs: prepare
     strategy:
-      matrix: ${{ fromJson(needs.prepare.outputs.tasks) }}
+      matrix: 
+        tag: ${{ fromJson(needs.prepare.outputs.tags) }}
       max-parallel: 5
       fail-fast: false
     permissions:
       contents: write
       packages: write
-    # NOTE: needs more if more output var added
-    # this is dumb, but we cannot generate dynamic outputs via needs.prepare.outputs.outputs
-    outputs:
-      output1: ${{ steps.push.outputs.output1 }}
-      output2: ${{ steps.push.outputs.output2 }}
-      output3: ${{ steps.push.outputs.output3 }}
-      output4: ${{ steps.push.outputs.output4 }}
-      output5: ${{ steps.push.outputs.output5 }}
-      output6: ${{ steps.push.outputs.output6 }}
-      output7: ${{ steps.push.outputs.output7 }}
-      output8: ${{ steps.push.outputs.output8 }}
-      output9: ${{ steps.push.outputs.output9 }}
-      output10: ${{ steps.push.outputs.output10 }}
-      output11: ${{ steps.push.outputs.output11 }}
-      output12: ${{ steps.push.outputs.output12 }}
-      output13: ${{ steps.push.outputs.output13 }}
-      output14: ${{ steps.push.outputs.output14 }}
-      output15: ${{ steps.push.outputs.output15 }}
-      output16: ${{ steps.push.outputs.output16 }}
-      output17: ${{ steps.push.outputs.output17 }}
-      output18: ${{ steps.push.outputs.output18 }}
-      output19: ${{ steps.push.outputs.output19 }}
-      output20: ${{ steps.push.outputs.output20 }}
-      output21: ${{ steps.push.outputs.output21 }}
-      output22: ${{ steps.push.outputs.output22 }}
-      output23: ${{ steps.push.outputs.output23 }}
-      output24: ${{ steps.push.outputs.output24 }}
-      output25: ${{ steps.push.outputs.output25 }}
-      output26: ${{ steps.push.outputs.output26 }}
-      output27: ${{ steps.push.outputs.output27 }}
-      output28: ${{ steps.push.outputs.output28 }}
-      output29: ${{ steps.push.outputs.output29 }}
-      output30: ${{ steps.push.outputs.output30 }}
+      id-token: write
+      attestations: write
     steps:
       # checkout source code
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup buildx oci builder
+        run: |
+          set -xeo pipefail
+
+          docker buildx inspect buildx-oci-builder ||
+          docker buildx create \
+            --driver docker-container \
+            --driver-opt image=moby/buildkit:master,network=host \
+            --bootstrap \
+            --name buildx-oci-builder
+          docker buildx use buildx-oci-builder
+
       - name: Set up secrets
         shell: python3 {0}
+        id: set-secrets
         run: |
           import os, json, base64
 
+          githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
           fw = open(os.path.expanduser("~/.docker/config.json"), "w")
 
           config = {
@@ -180,6 +153,7 @@ jobs:
             config["auths"]["public.ecr.aws"] = {
               "auth": cred,
             }
+            githubOutput.write(f"has_aws_ecr=1\n")
 
           # DockerHub
           cred = "${{ secrets.DOCKERHUB_CRED }}"
@@ -187,6 +161,7 @@ jobs:
             config["auths"]["https://index.docker.io/v1/"] = {
               "auth": cred,
             }
+            githubOutput.write(f"has_dockerhub=1\n")
 
           fw.write(json.dumps(config))
           fw.close()
@@ -195,107 +170,125 @@ jobs:
         shell: bash
         id: build
         run: |
-          ./build.py "${{ matrix.tag.tag }}"
+          GITHUB_TOKEN="${{ github.token }}" \
+            python -u \
+            ./build.py "${{ matrix.tag }}" \
+              ${{ needs.prepare.outputs.images }} \
+              --oci \
+              --arch-suffix \
+              --gen-metadata \
+              --push
 
-      - name: Push image
-        shell: bash
-        id: push
-        run: |
-          ./.github/workflows/pushimage.py '${{ matrix.tag.tag }}' '${{ needs.prepare.outputs.images }}'
+          cat metadata_stripped.json
+          cat metadata_debuggable.json
 
-  gen-attests:
-    name: Generate attestation jobs
-    runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
-    needs: build
-    if: ${{ always() }}
-    outputs:
-      tasks: ${{ steps.gen-attests.outputs.tasks }}
-    steps:
-      - name: Duplicate json
-        shell: cp {0} ./attests.json
-        run: |
-          ${{ toJson(needs.build.outputs) }}
+          digest=$(jq -r '."containerimage.digest"' metadata_stripped.json)
+          echo "stripped_digest=${digest}" >> "${GITHUB_OUTPUT}"
 
-      - name: Generate attestation jobs
-        shell: python3 {0}
-        id: gen-attests
-        run: |
-          import json, os
-          hashes = json.load(open("./attests.json"))
-          
-          imageDigests = {}
+          digest=$(jq -r '."containerimage.digest"' metadata_debuggable.json)
+          echo "debuggable_digest=${digest}" >> "${GITHUB_OUTPUT}"
 
-          for _, content in hashes.items():
-            if not content:
-              continue
-            for image, digest in json.loads(content).items():
-              imageName = image.split(":")[0]
-              imageDigests[imageName] = imageDigests.get(imageName, [])
-              imageDigests[imageName].append(digest)
-
-          attests = []
-          for imageName, digests in imageDigests.items():
-            for digest in digests:
-              attests.append({
-                "image": imageName,
-                "digest": digest,
-              })
-
-          serialized = json.dumps({"attests": attests})
-          githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
-          githubOutput.write(f"tasks={serialized}\n")
-          githubOutput.close()
-
-  attest:
-    name: ${{ matrix.attests.image }} artifact attestation
-    runs-on: "${{ inputs.runsOn || 'ubuntu-latest' }}"
-    needs: gen-attests
-    strategy:
-      matrix: ${{ fromJson(needs.gen-attests.outputs.tasks) }}
-      max-parallel: 10
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
-      attestations: write
-    steps:
-      - name: Set up secrets
-        shell: python3 {0}
-        run: |
-          import os, json, base64
-
-          fw = open(os.path.expanduser("~/.docker/config.json"), "w")
-
-          config = {
-            "auths": {},
-          }
-
-          # GHCR
-          cred = base64.b64encode(b'whatever:${{ github.token }}').decode()
-          config["auths"]["ghcr.io"] = {
-            "auth": cred,
-          }
-
-          # AWS ECR
-          cred = "${{ secrets.AWS_ECR_CRED }}"
-          if cred:
-            config["auths"]["public.ecr.aws"] = {
-              "auth": cred,
-            }
-
-          # DockerHub
-          cred = "${{ secrets.DOCKERHUB_CRED }}"
-          if cred:
-            config["auths"]["https://index.docker.io/v1/"] = {
-              "auth": cred,
-            }
-
-          fw.write(json.dumps(config))
-          fw.close()
-
-      - name: Generate artifact attestation
+      # why github donot allow attest multiple images at once?
+      - name: Generate provenance attestation for stripped image at ghcr.io
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ${{ matrix.attests.image }}
-          subject-digest: ${{ matrix.attests.digest }}
+          subject-name: ${{ inputs.ghcrImageName || format('ghcr.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.build.outputs.stripped_digest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for debuggable image at ghcr.io
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ inputs.ghcrImageName || format('ghcr.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.build.outputs.debuggable_digest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for stripped image at dockerhub
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.set-secrets.outputs.has_dockerhub }}
+        with:
+          subject-name: ${{ inputs.dockerhubImageName || format('index.docker.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.build.outputs.stripped_digest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for debuggable image at dockerhub
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.set-secrets.outputs.has_dockerhub }}
+        with:
+          subject-name: ${{ inputs.dockerhubImageName || format('index.docker.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.build.outputs.debuggable_digest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for stripped image at aws-ecr
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.set-secrets.outputs.has_aws_ecr }}
+        with:
+          subject-name: ${{ inputs.awsEcrImageName || format('public.ecr.aws/{0}', github.repository) }}
+          subject-digest: ${{ steps.build.outputs.stripped_digest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for debuggable image at aws-ecr
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.set-secrets.outputs.has_aws_ecr }}
+        with:
+          subject-name: ${{ inputs.awsEcrImageName || format('public.ecr.aws/{0}', github.repository) }}
+          subject-digest: ${{ steps.build.outputs.debuggable_digest }}
+          push-to-registry: true
+
+      - name: Merge images
+        shell: bash
+        id: merge
+        run: |
+          ./.github/workflows/mergeimages.py \
+            '${{ matrix.tag }}' \
+            '${{ steps.build.outputs.stripped_digest }}' \
+            '${{ steps.build.outputs.debuggable_digest }}' \
+            ${{ needs.prepare.outputs.images }}
+
+      - name: Generate provenance attestation for merged stripped image at ghcr.io
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.merge.outputs.ghcrStrippedDigest }}
+        with:
+          subject-name: ${{ inputs.ghcrImageName || format('ghcr.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.merge.outputs.ghcrStrippedDigest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for merged debuggable image at ghcr.io
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.merge.outputs.ghcrDebuggableDigest }}
+        with:
+          subject-name: ${{ inputs.ghcrImageName || format('ghcr.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.merge.outputs.ghcrDebuggableDigest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for merged stripped image at dockerhub
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.merge.outputs.dockerhubStrippedDigest }}
+        with:
+          subject-name: ${{ inputs.dockerhubImageName || format('index.docker.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.merge.outputs.dockerhubStrippedDigest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for merged debuggable image at dockerhub
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.merge.outputs.dockerhubDebuggableDigest }}
+        with:
+          subject-name: ${{ inputs.dockerhubImageName || format('index.docker.io/{0}', github.repository) }}
+          subject-digest: ${{ steps.merge.outputs.dockerhubDebuggableDigest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for merged stripped image at aws-ecr
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.merge.outputs.awsEcrStrippedDigest }}
+        with:
+          subject-name: ${{ inputs.awsEcrImageName || format('public.ecr.aws/{0}', github.repository) }}
+          subject-digest: ${{ steps.merge.outputs.awsEcrStrippedDigest }}
+          push-to-registry: true
+
+      - name: Generate provenance attestation for merged debuggable image at aws-ecr
+        uses: actions/attest-build-provenance@v2
+        if: ${{ steps.merge.outputs.awsEcrDebuggableDigest }}
+        with:
+          subject-name: ${{ inputs.awsEcrImageName || format('public.ecr.aws/{0}', github.repository) }}
+          subject-digest: ${{ steps.merge.outputs.awsEcrDebuggableDigest }}
           push-to-registry: true

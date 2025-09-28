@@ -28,8 +28,8 @@ alpine分支用于构建基于alpine的镜像
 
 ### 构建
 
-```bash
-IMAGE_NAME=some-registry.domain/some-namespace/some-image-name ./build.py "<tag>"
+```text
+./build.py <tag> [--export-to-oci] [--image-name=<IMAGE_NAME>] [--push]
 ```
 
 其中`IMAGE_NAME`为镜像名，比如`ghcr.io/mycomp/php-dockerfile`
