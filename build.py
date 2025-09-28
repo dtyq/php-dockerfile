@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys, re, subprocess, socket
+import os, sys, re, subprocess, socket, urllib.request, json
 
 tagRe = re.compile(
     r"^(?P<phpver>\d\.\d)-alpine-(?P<alpinever>(?:\d\.\d+|edge))-(?P<ext>swow|swoole)-(?P<extver>\d+\.\d+\.\d+(?:-alpha(?:\.\d+)*)*(?:-nightly\d+)*|ci|master)(?P<exts>(?:-[^-]+)*)$"
@@ -17,6 +17,28 @@ tryMirrors = os.environ.get(
 
 
 publicMirror = os.environ.get("PUBLIC_MIRROR", "https://mirrors.ustc.edu.cn")
+
+
+def getHEADRev(repo: str, branch: str) -> str:
+    url = f"https://api.github.com/repos/{repo}/commits/{branch}"
+    with urllib.request.urlopen(
+        urllib.request.Request(
+            url,
+            headers={
+                **(
+                    {
+                        "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                    }
+                    if os.environ.get("GITHUB_TOKEN")
+                    else {}
+                ),
+                "Accept": "application/json",
+                "User-Agent": "php-dockerfile/1.0",
+            },
+        )
+    ) as response:
+        data = json.loads(response.read().decode())
+        return data["sha"]
 
 
 def mian(argv0, tag, *args):
@@ -40,18 +62,20 @@ def mian(argv0, tag, *args):
         if groups["extver"] == "ci":
             raise Exception("swoole不使用ci分支")
         elif groups["extver"] == "master":
-            extUrl = "https://github.com/swoole/swoole-src/archive/refs/heads/master.tar.gz"
+            extRev = getHEADRev("swoole/swoole-src", "master")
+            extUrl = f"https://github.com/swoole/swoole-src/archive/{extRev}.tar.gz"
         else:
-            extUrl = (
-                f"https://github.com/swoole/swoole-src/archive/v{groups['extver']}.tar.gz"
-            )
+            extRev = getHEADRev("swoole/swoole-src", groups['extver'])
+            extUrl = f"https://github.com/swoole/swoole-src/archive/v{groups['extver']}.tar.gz"
         extDev = f"libpq-dev c-ares-dev curl-dev openssl-dev libstdc++"
     elif groups["ext"] == "swow":
         if groups["extver"] == "master":
             raise Exception("swow不使用master分支")
         elif groups["extver"] == "ci":
-            extUrl = "https://github.com/swow/swow/archive/refs/heads/ci.tar.gz"
+            extRev = getHEADRev("swow/swow", "ci")
+            extUrl = f"https://github.com/swow/swow/archive/{extRev}.tar.gz"
         else:
+            extRev = getHEADRev("swow/swow", 'v' + groups['extver'])
             extUrl = f"https://github.com/swow/swow/archive/v{groups['extver']}.tar.gz"
         extDev = f"libpq-dev curl-dev openssl-dev"
     else:
@@ -90,6 +114,8 @@ def mian(argv0, tag, *args):
         "build",
         "-t",
         fullTag,
+        "--metadata-file",
+        "metadata_stripped.json",
         "--pull",
         "--no-cache",
         "--force-rm",
@@ -102,6 +128,8 @@ def mian(argv0, tag, *args):
         f"PHP_VERSION={groups['phpver']}",
         "--build-arg",
         f"EXT_URL={extUrl}",
+        "--build-arg",
+        f"EXT_REV={extRev}",
         "--build-arg",
         f"EXT_DEV={extDev}",
         "--build-arg",
@@ -126,6 +154,8 @@ def mian(argv0, tag, *args):
         f"{fullTag}-debuggable",
         # "--pull",
         # "--no-cache",
+        "--metadata-file",
+        "metadata_debuggable.json",
         "--force-rm",
         "--progress=plain",
         "--target",
@@ -136,6 +166,8 @@ def mian(argv0, tag, *args):
         f"PHP_VERSION={groups['phpver']}",
         "--build-arg",
         f"EXT_URL={extUrl}",
+        "--build-arg",
+        f"EXT_REV={extRev}",
         "--build-arg",
         f"EXT_DEV={extDev}",
         "--build-arg",
@@ -150,6 +182,7 @@ def mian(argv0, tag, *args):
     debuggableBuild.wait()
     if debuggableBuild.returncode != 0:
         raise Exception("构建有符号版本失败")
+
 
 if __name__ == "__main__":
     exit(mian(*sys.argv))

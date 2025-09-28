@@ -1,9 +1,10 @@
 # Copyright 2025 DTYQ <dev@dtyq.com>
 # Copyright 2025 Yun Dou <douyun@dtyq.com>
 
-ARG ALPINE_VERSION
+ARG ALPINE_VERSION=latest
 
-FROM alpine:$ALPINE_VERSION AS php_base
+FROM public.ecr.aws/docker/library/alpine:$ALPINE_VERSION AS php_base
+
 
 ARG ALPINE_VERSION
 ARG PHP_VERSION
@@ -268,8 +269,28 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
 
 FROM php_base AS stripped
 
+ARG EXT_REV
+
+LABEL \
+    org.opencontainers.image.description="PHP ${PHP_VERSION} image with some extensions on Alpine ${ALPINE_VERSION}" \
+    org.opencontainers.image.url="https://github.com/dtyq/php-dockerfile" \
+    org.opencontainers.image.source="https://github.com/dtyq/php-dockerfile" \
+    com.dtyq.php-dockerfile.extension.revision="${EXT_REV}" \
+    com.dtyq.php-dockerfile.php.version="${PHP_VERSION}" \
+    com.dtyq.php-dockerfile.alpine.version="${ALPINE_VERSION}"
+
 COPY --from=exts_builder /tmp/stripped /
 
 FROM php_base AS debuggable
+
+ARG EXT_REV
+
+LABEL \
+    org.opencontainers.image.description="PHP ${PHP_VERSION} image with some extensions on Alpine ${ALPINE_VERSION}" \
+    org.opencontainers.image.url="https://github.com/dtyq/php-dockerfile" \
+    org.opencontainers.image.source="https://github.com/dtyq/php-dockerfile" \
+    com.dtyq.php-dockerfile.extension.revision="${EXT_REV}" \
+    com.dtyq.php-dockerfile.php.version="${PHP_VERSION}" \
+    com.dtyq.php-dockerfile.alpine.version="${ALPINE_VERSION}"
 
 COPY --from=exts_builder /tmp/withdebug /
