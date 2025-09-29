@@ -50,15 +50,15 @@ def mian():
     parser.add_argument("--oci", action="store_true", help="export to oci format")
     parser.add_argument("--gen-metadata", help="generate metadata", action="store_true")
     parser.add_argument("--push", action="store_true", help="push to registry")
-    parser.add_argument("--arch-suffix", action="store_true", help="add arch suffix to image name")
+    parser.add_argument(
+        "--arch-suffix", action="store_true", help="add arch suffix to image name"
+    )
     args = parser.parse_args()
 
     tag = args.TAG
     match = tagRe.match(args.TAG)
     if not match:
-        raise Exception(
-            f"错误的tag格式"
-        )
+        raise Exception(f"错误的tag格式")
 
     groups = match.groupdict()
     if groups["exts"]:
@@ -79,7 +79,7 @@ def mian():
             extRev = getHEADRev("swoole/swoole-src", "master")
             extUrl = f"https://github.com/swoole/swoole-src/archive/{extRev}.tar.gz"
         else:
-            extRev = getHEADRev("swoole/swoole-src", groups["extver"])
+            extRev = getHEADRev("swoole/swoole-src", "v" + groups["extver"])
             extUrl = f"https://github.com/swoole/swoole-src/archive/v{groups['extver']}.tar.gz"
         extDev = f"libpq-dev c-ares-dev curl-dev openssl-dev libstdc++"
     elif groups["ext"] == "swow":
@@ -225,6 +225,7 @@ def mian():
 
     if os.getenv("CI"):
         print("##[endgroup]")
+
 
 if __name__ == "__main__":
     exit(mian())
