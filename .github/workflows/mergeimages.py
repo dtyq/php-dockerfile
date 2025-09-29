@@ -124,14 +124,7 @@ class Manifest:
             },
         )
         if response.status_code == 404:
-            resp = response.json()
-            if (
-                len(resp.get("errors")) == 0
-                or resp.get("errors")[0].get("code") != "MANIFEST_UNKNOWN"
-            ):
-                raise Exception(
-                    f"failed to get manifest for {repository}:{ref} {response.status_code} {response.text}"
-                )
+            logging.debug(f"manifest {ref} for {repository} not found: {response.text}")
             return None
         if response.status_code != 200:
             raise Exception(
@@ -155,7 +148,7 @@ class Manifest:
             headers={"Accept": "*"},
         )
         if response.status_code == 404:
-            logging.debug(f"blob {digest} for {repository} not found")
+            logging.debug(f"blob {digest} for {repository} not found: {response.text}")
             return None
         if response.status_code != 200:
             raise Exception(
@@ -187,6 +180,7 @@ class Manifest:
 
 githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
 
+
 def mergeimage(image: str, tag: str, digest: str) -> bool:
     m = imageNameRe.match(image)
     registry = m.group("registry")
@@ -202,7 +196,6 @@ def mergeimage(image: str, tag: str, digest: str) -> bool:
                 f"no single arch manifest for {registry}/{repository}:{tag}-{arch}"
             )
             continue
-        singleArchManifests[arch] = singleArchManifest
         if not singleArchManifest.isIndex():
             configBytes = Manifest.getBlob(
                 registry, repository, singleArchManifest.manifest["config"]["digest"]
@@ -223,6 +216,7 @@ def mergeimage(image: str, tag: str, digest: str) -> bool:
                 0,
                 "",
             )
+        singleArchManifests[arch] = singleArchManifest
 
     if singleArchManifests[dockerArch].digest != digest:
         logging.error(
@@ -275,10 +269,8 @@ def mergeimage(image: str, tag: str, digest: str) -> bool:
             f"failed to push index manifest for {registry}/{repository}:{tag} {response.status_code} {response.text}"
         )
         return False
-    multiArchDigest = response.headers['docker-content-digest']
-    logging.info(
-        f"image {image}:{tag} created with digest: {multiArchDigest}"
-    )
+    multiArchDigest = response.headers["docker-content-digest"]
+    logging.info(f"image {image}:{tag} created with digest: {multiArchDigest}")
     if tag.endswith("-debuggable"):
         if image.startswith("ghcr.io/"):
             githubOutput.write(f"ghcrDebuggableDigest={multiArchDigest}\n")
