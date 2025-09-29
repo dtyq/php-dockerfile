@@ -135,7 +135,7 @@ class Manifest:
         manifest = response.json()
         cls.manifestCache[ref] = cls(
             manifest,
-            response.headers.get("Content-Length"),
+            int(response.headers.get("content-length")),
             response.headers.get("docker-content-digest"),
         )
         return cls.manifestCache[ref]
