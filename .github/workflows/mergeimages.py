@@ -117,7 +117,7 @@ class Manifest:
         cls, registry: str, repository: str, ref: str
     ) -> Optional["Manifest"]:
         if ref in cls.manifestCache:
-            return cls.manifestCache[ref]
+            return cls.manifestCache[f"{registry}/{repository}|{ref}"]
         response = request(
             registry,
             f"/v2/{repository}/manifests/{ref}",
@@ -133,12 +133,12 @@ class Manifest:
                 f"failed to get manifest for {repository}:{ref} {response.status_code} {response.text}"
             )
         manifest = response.json()
-        cls.manifestCache[ref] = cls(
+        cls.manifestCache[f"{registry}/{repository}|{ref}"] = cls(
             manifest,
             int(response.headers.get("content-length")),
             response.headers.get("docker-content-digest"),
         )
-        return cls.manifestCache[ref]
+        return cls.manifestCache[f"{registry}/{repository}|{ref}"]
 
     @classmethod
     def getBlob(cls, registry: str, repository: str, digest: str) -> Optional[bytes]:
