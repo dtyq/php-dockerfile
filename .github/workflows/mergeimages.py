@@ -54,6 +54,8 @@ def request(
                 del tokens[challenge]
 
         # if we don't have a token for this challenge, get one
+        if registry == "index.docker.io":
+            registry = "https://index.docker.io/v1/"
         if not dockerConfigDict.get("auths", {}).get(registry):
             raise Exception(
                 f"no credentials for {registry} but authentication required"
