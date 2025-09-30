@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+import hashlib
 import sys
 import os
 import json
 import subprocess
 import re
+from collections import OrderedDict
 from typing import Optional, Union
 import urllib.parse
 import base64
@@ -16,7 +18,9 @@ from urllib3 import response
 
 # logging.basicConfig(level=logging.DEBUG)
 
-SUPPORTED_ARCHS = ["amd64", "arm64"]
+SUPPORTED_ARCHS = ("amd64", "arm64")
+
+githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
 
 dockerConfigDict = json.load(open(os.path.expanduser("~/.docker/config.json")))
 imageNameRe = re.compile(r"^(?P<registry>[^/]+)/(?P<image>[^:@]+)$")
@@ -33,21 +37,27 @@ def request(
     path: str,
     method: str = "GET",
     headers: dict = None,
-    data: dict = None,
+    data: dict | str = None,
 ) -> requests.Response:
     global tokens
     if not headers:
         headers = {}
 
     url = f"https://{registry}{path}"
-    response = requests.request(method, url, headers=headers, json=data)
+    if isinstance(data, dict):
+        response = requests.request(method, url, headers=headers, json=data)
+    else:
+        response = requests.request(method, url, headers=headers, data=data)
     if response.status_code == 401:
         challenge = response.headers.get("WWW-Authenticate").removeprefix("Bearer ")
 
         # if we have a token for this challenge, use it
         if tokens.get(challenge):
             headers["Authorization"] = f"Bearer {tokens[challenge]}"
-            response = requests.request(method, url, headers=headers, json=data)
+            if isinstance(data, dict):
+                response = requests.request(method, url, headers=headers, json=data)
+            else:
+                response = requests.request(method, url, headers=headers, data=data)
             if response.status_code != 401:
                 return response
             else:
@@ -57,9 +67,7 @@ def request(
         if registry == "index.docker.io":
             registry = "https://index.docker.io/v1/"
         if not dockerConfigDict.get("auths", {}).get(registry):
-            raise Exception(
-                f"no credentials for {registry} but authentication required"
-            )
+            base64Cred = None
         base64Cred = dockerConfigDict["auths"][registry]["auth"]
 
         # parse challenge
@@ -81,16 +89,25 @@ def request(
         # print(f"oauthURL: {oauthURL}")
 
         # get token
+        authHeaders = {
+            "accept": "application/json",
+        }
+        if base64Cred:
+            authHeaders["authorization"] = f"Basic {base64Cred}"
         response = requests.get(
             oauthURL,
-            headers={
-                "accept": "application/json",
-                "authorization": f"Basic {base64Cred}",
-            },
+            headers=authHeaders,
         )
         tokens[challenge] = response.json()["token"]
         headers["Authorization"] = f"Bearer {tokens[challenge]}"
-        response = requests.request(method, url, headers=headers, json=data)
+        if isinstance(data, dict):
+            response = requests.request(method, url, headers=headers, json=data)
+        else:
+            response = requests.request(method, url, headers=headers, data=data)
+        if response.status_code == 401:
+            raise Exception(
+                f"failed to authenticate: {response.headers.get('WWW-Authenticate')} {response.text}"
+            )
         return response
 
     return response
@@ -132,6 +149,8 @@ class Manifest:
             raise Exception(
                 f"failed to get manifest for {repository}:{ref} {response.status_code} {response.text}"
             )
+        # print(response.text)
+        # exit(1)
         manifest = response.json()
         cls.manifestCache[f"{registry}/{repository}|{ref}"] = cls(
             manifest,
@@ -180,7 +199,27 @@ class Manifest:
         }
 
 
-githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
+def sortManifestRef(manifestRef: dict) -> dict:
+    # from https://github.com/opencontainers/image-spec/blob/main/specs-go/v1/descriptor.go
+    ret = OrderedDict()
+    ret["mediaType"] = manifestRef["mediaType"]
+    ret["digest"] = manifestRef["digest"]
+    ret["size"] = manifestRef["size"]
+    if "platform" in manifestRef:
+        ret["platform"] = OrderedDict()
+        ret["platform"]["architecture"] = manifestRef["platform"]["architecture"]
+        ret["platform"]["os"] = manifestRef["platform"]["os"]
+        if "os.version" in manifestRef["platform"]:
+            ret["platform"]["os.version"] = manifestRef["platform"]["os.version"]
+        if "os.features" in manifestRef["platform"]:
+            ret["platform"]["os.features"] = manifestRef["platform"]["os.features"]
+        if "variant" in manifestRef["platform"]:
+            ret["platform"]["variant"] = manifestRef["platform"]["variant"]
+    if "annotations" in manifestRef:
+        ret["annotations"] = OrderedDict()
+        for k, v in sorted(manifestRef["annotations"].items(), key=lambda x: x[0]):
+            ret["annotations"][k] = v
+    return ret
 
 
 def mergeimage(image: str, tag: str, digest: str) -> bool:
@@ -190,7 +229,7 @@ def mergeimage(image: str, tag: str, digest: str) -> bool:
     dockerArch = toDockerArch(os.uname().machine)
 
     # get all single arch manifests
-    singleArchManifests: dict[str, dict] = {}
+    singleArchManifests: OrderedDict[str, dict] = OrderedDict()
     for arch in SUPPORTED_ARCHS:
         singleArchManifest = Manifest.getManifest(registry, repository, f"{tag}-{arch}")
         if singleArchManifest is None:
@@ -222,7 +261,7 @@ def mergeimage(image: str, tag: str, digest: str) -> bool:
 
     if singleArchManifests[dockerArch].digest != digest:
         logging.error(
-            f"single arch manifest for {registry}/{repository}:{tag}-{dockerArch} mismatch with digest {digest}, image upload failed"
+            f"single arch manifest for {registry}/{repository}:{tag}-{dockerArch}@{singleArchManifests[dockerArch].digest} mismatch with digest {digest}, image upload failed"
         )
         return False
 
@@ -230,33 +269,44 @@ def mergeimage(image: str, tag: str, digest: str) -> bool:
     manifestRefs: list[dict] = []
     for arch, singleArchManifest in singleArchManifests.items():
         for manifestRef in singleArchManifest.manifest["manifests"]:
-            manifestRefs.append(manifestRef)
-            if arch and arch != "unknown":
-                # try get github attestations for this arch
-                attestTag = singleArchManifest.digest.replace(":", "-")
-                attestManifest = Manifest.getManifest(registry, repository, attestTag)
-                if attestManifest is None:
-                    logging.info(
-                        f"no github provenance attest manifest for {registry}/{repository}@{singleArchManifest.digest}"
-                    )
-                    continue
-                if attestManifest.isIndex():
-                    for manifestRef in attestManifest.manifest["manifests"]:
-                        # github will use empty string as platform, so we need to set it to unknown
-                        manifestRef["platform"] = {
-                            "architecture": "unknown",
-                            "os": "unknown",
-                        }
-                        manifestRefs.append(manifestRef)
-                else:
-                    manifestRefs.append(attestManifest.toRefDict())
+            # sort single arch manifest refs to generate deterministic index manifest
+            manifestRefs.append(sortManifestRef(manifestRef))
+            # manifestRefs.append(manifestRef)
+            logging.debug(
+                f"added manifest {manifestRef['digest']} for {registry}/{repository}:{tag}-{arch}"
+            )
+            # if arch and arch != "unknown":
+            #     # try get github attestations for this arch
+            #     attestTag = singleArchManifest.digest.replace(":", "-")
+            #     attestManifest = Manifest.getManifest(registry, repository, attestTag)
+            #     if attestManifest is None:
+            #         logging.info(
+            #             f"no github provenance attest manifest for {registry}/{repository}@{singleArchManifest.digest}"
+            #         )
+            #         continue
+            #     if attestManifest.isIndex():
+            #         for manifestRef in attestManifest.manifest["manifests"]:
+            #             # github will use empty string as platform, so we need to set it to unknown
+            #             manifestRef["platform"] = {
+            #                 "architecture": "unknown",
+            #                 "os": "unknown",
+            #             }
+            #             manifestRefs.append(manifestRef)
+            #     else:
+            #         manifestRefs.append(attestManifest.toRefDict())
 
     # create index manifest
-    indexManifest = {
-        "mediaType": "application/vnd.oci.image.index.v1+json",
-        "schemaVersion": 2,
-        "manifests": manifestRefs,
-    }
+    indexManifest = OrderedDict()
+    # order of fields from https://github.com/opencontainers/image-spec/blob/main/specs-go/v1/index.go
+    indexManifest["schemaVersion"] = 2
+    indexManifest["mediaType"] = "application/vnd.oci.image.index.v1+json"
+    indexManifest["manifests"] = manifestRefs
+    indexManifestString = json.dumps(indexManifest, indent=2)
+    logging.info("index manifest: " + indexManifestString)
+    logging.info(
+        "index manifest sha256: "
+        + hashlib.sha256(indexManifestString.encode()).hexdigest()
+    )
     response = request(
         registry,
         f"/v2/{repository}/manifests/{tag}",
@@ -264,7 +314,7 @@ def mergeimage(image: str, tag: str, digest: str) -> bool:
         headers={
             "Content-Type": "application/vnd.oci.image.index.v1+json",
         },
-        data=indexManifest,
+        data=indexManifestString,
     )
     if response.status_code >= 300 or response.status_code < 200:
         logging.error(
