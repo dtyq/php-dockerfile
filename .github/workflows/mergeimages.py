@@ -36,8 +36,8 @@ def request(
     registry: str,
     path: str,
     method: str = "GET",
-    headers: dict = None,
-    data: dict | str = None,
+    headers: Optional[dict] = None,
+    data: Union[dict, str, None] = None,
 ) -> requests.Response:
     global tokens
     if not headers:
