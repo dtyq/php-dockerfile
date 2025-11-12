@@ -46,6 +46,8 @@ jobs:
           extVersions = [
             # swoole master branch
             ("swoole-master", "8.1", None),
+            # swoole 6.1 branch
+            ("swoole-6.1.2", "8.1", None),
             # swoole 6.0 branch
             ("swoole-6.0.2", "8.1", None),
             # swoole 5.1 branch
