@@ -36,20 +36,20 @@ jobs:
           from distutils.version import LooseVersion
 
           phpAlpineVersions = {
-            "8.4": "3.22",
-            "8.3": "3.22",
+            "8.5": "3.23",
+            "8.4": "3.23",
+            "8.3": "3.23",
             "8.2": "3.22",
             "8.1": "3.18",
-            "8.0": "3.16",
           }
 
           extVersions = [
             # swoole master branch
-            ("swoole-master", "8.1", None),
+            ("swoole-master", "8.1", "8.4"),
             # swoole 6.1 branch
-            ("swoole-6.1.2", "8.1", None),
+            ("swoole-6.1.6", "8.1", "8.4"),
             # swoole 6.0 branch
-            ("swoole-6.0.2", "8.1", None),
+            ("swoole-6.0.2", "8.1", "8.4"),
             # swoole 5.1 branch
             ("swoole-5.1.8", "8.0", "8.3"),
             # swoole 4.8 branch
@@ -57,7 +57,7 @@ jobs:
             # swow ci branch
             ("swow-ci", "8.0", None),
             # swow
-            ("swow-1.6.2", "8.0", "8.4"),
+            ("swow-1.6.2", "8.0", "8.5"),
           ]
 
           extraExts = [

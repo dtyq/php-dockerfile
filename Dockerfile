@@ -29,8 +29,9 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.4-edge"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
-        "8.3-edge"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
+        "8.5-edge"|"8.5-3.23") suffix=85;; \
+        "8.4-edge"|"8.4-3.23"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
+        "8.3-edge"|"8.3-3.23"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
         "8.2-edge"|"8.2-3.22"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
         "8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
         "8.0-3.16"|"8.0-3.15") suffix=8;; \
@@ -38,6 +39,7 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
         *) echo "not supported php ${PHP_VERSION} on alpine ${ALPINE_VERSION}"; exit 1;; \
     esac ; \
     DEPS="$(echo "${EXT_DEV}" | sed 's/-dev//g')" ; \
+    OPCACHE="$([ "${PHP_VERSION}" != "8.5" ] && echo php${suffix}-opcache~${PHP_VERSION} || : )" ; \
     apk add --no-cache \
         # Install base packages ('ca-certificates' will install 'nghttp2-libs')
         ca-certificates \
@@ -80,7 +82,7 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
         php${suffix}-xmlwriter~${PHP_VERSION} \
         php${suffix}-simplexml~${PHP_VERSION} \
         php${suffix}-pcntl~${PHP_VERSION} \
-        php${suffix}-opcache~${PHP_VERSION} \
+        $OPCACHE \
         php${suffix}-pecl-redis \
         php${suffix}-pecl-igbinary \
         php${suffix}-pecl-mongodb \
@@ -120,8 +122,9 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.4-edge"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
-        "8.3-edge"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
+        "8.5-edge"|"8.5-3.23") suffix=85;; \
+        "8.4-edge"|"8.4-3.23"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
+        "8.3-edge"|"8.3-3.23"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
         "8.2-edge"|"8.2-3.22"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
         "8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
         "8.0-3.16"|"8.0-3.15") suffix=8;; \
@@ -250,8 +253,9 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
     set -eo pipefail && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.4-edge"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
-        "8.3-edge"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
+        "8.5-edge"|"8.5-3.23") suffix=85;; \
+        "8.4-edge"|"8.4-3.23"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
+        "8.3-edge"|"8.3-3.23"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
         "8.2-edge"|"8.2-3.22"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
         "8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
         "8.0-3.16"|"8.0-3.15") suffix=8;; \
