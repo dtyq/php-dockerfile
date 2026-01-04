@@ -21,6 +21,7 @@ tar -xf ext.tar.gz -C "${EXT}" --strip-components=1
 rm ext.tar.gz
 
 cd "${EXT}"
+    curl -sfSL https://github.com/weltling/parle/pull/59.patch | patch -p1
     printf "\033[44;37m PHPIZE and configure %s \033[0m\n" "${EXT}"
     "phpize${suffix}"
     ./configure \

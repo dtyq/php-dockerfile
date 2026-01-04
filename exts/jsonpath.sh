@@ -9,7 +9,7 @@ suffix="${suffix-""}"
 EXT=jsonpath
 EXT_DIR="${EXT}"
 CONFIGURE_ARGS=""
-URL=https://pecl.php.net/get/jsonpath-3.0.0.tgz
+URL=https://pecl.php.net/get/jsonpath-3.1.0.tgz
 
 printf "\033[44;37m Start build extension %s \033[0m\n" "${EXT}"
 

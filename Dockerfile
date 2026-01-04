@@ -52,6 +52,7 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
         tzdata \
         pcre \
         $DEPS \
+        patch \
         php${suffix}~${PHP_VERSION} \
         # align phpx-common with phpx version
         php${suffix}-common~${PHP_VERSION} \
