@@ -18,7 +18,8 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
     echo "${MIRROR}/alpine/v3.22/main" > /etc/apk/repositories && \
     echo "${MIRROR}/alpine/v3.22/community" >> /etc/apk/repositories && \
-    apk add --no-cache mimalloc2 && \
+    apk update && \
+    apk add mimalloc2 && \
     mv /etc/apk/repositories.orig /etc/apk/repositories
 
 ENV LD_PRELOAD=/usr/lib/libmimalloc.so.2
@@ -40,7 +41,8 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
     esac ; \
     DEPS="$(echo "${EXT_DEV}" | sed 's/-dev//g')" ; \
     OPCACHE="$([ "${PHP_VERSION}" != "8.5" ] && echo php${suffix}-opcache~${PHP_VERSION} || : )" ; \
-    apk add --no-cache \
+    apk update && \
+    apk add \
         # Install base packages ('ca-certificates' will install 'nghttp2-libs')
         ca-certificates \
         curl \
@@ -132,7 +134,8 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
         *) echo "not supported php ${PHP_VERSION} on alpine ${ALPINE_VERSION}"; exit 1;; \
     esac ; \
     # build time dependencies
-    apk add --no-cache --virtual .build-deps \
+    apk update && \
+    apk add --virtual .build-deps \
         # build tools
         autoconf \
         automake \
