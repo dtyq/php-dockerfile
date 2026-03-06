@@ -12,19 +12,21 @@ ARG EXT_DEV
 ARG MIRROR
 ARG CURL_PROXY
 
+ARG TARGETARCH
+
 # setup mimalloc
-RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
+RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var/cache/apk \
     set -eo pipefail ; \
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
-    echo "${MIRROR}/alpine/v3.22/main" > /etc/apk/repositories && \
-    echo "${MIRROR}/alpine/v3.22/community" >> /etc/apk/repositories && \
+    echo "${MIRROR}/alpine/v3.23/main" > /etc/apk/repositories && \
+    echo "${MIRROR}/alpine/v3.23/community" >> /etc/apk/repositories && \
     apk update && \
     apk add mimalloc2 && \
     mv /etc/apk/repositories.orig /etc/apk/repositories
 
 ENV LD_PRELOAD=/usr/lib/libmimalloc.so.2
 
-RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
+RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var/cache/apk \
     set -eo pipefail ; \
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
@@ -118,8 +120,10 @@ ARG EXT_URL
 ARG EXT_DEV
 ARG CURL_PROXY
 
+ARG TARGETARCH
+
 # build extension
-RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
+RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var/cache/apk \
     set -eo pipefail; \
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
@@ -251,9 +255,11 @@ ARG ALPINE_VERSION
 ARG PHP_VERSION
 ARG EXTS
 
+ARG TARGETARCH
+
 COPY exts /usr/src/exts/
 
-RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION},target=/var/cache/apk \
+RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var/cache/apk \
     set -eo pipefail && \
     # setup suffix
     case "${PHP_VERSION}-${ALPINE_VERSION}" in \
