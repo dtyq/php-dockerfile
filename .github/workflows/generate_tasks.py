@@ -86,6 +86,10 @@ for phpVer, alpineVer in phpAlpineVersions.items():
             f"MIRROR={os.environ['PUBLIC_MIRROR']}",
         ])
         task["tag"] = tag
+        if parse_version(alpineVer) >= parse_version("3.22"):
+            task["platforms"] = f"linux/amd64,linux/arm64,linux/riscv64"
+        else:
+            task["platforms"] = f"linux/amd64,linux/arm64"
         tasks.append(task)
 
 print(f"generated tasks: {json.dumps(tasks, indent=2)}")
