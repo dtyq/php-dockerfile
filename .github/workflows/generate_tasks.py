@@ -13,13 +13,17 @@ phpAlpineVersions = {
 
 extVersions = [
     # swoole master branch
-    ("swoole", "master", "8.2", "8.4"),
+    ("swoole", "master", "8.2", "8.5"),
+    # swoole 6.2 branch
+    ("swoole", "v6.2.0", "8.2", "8.5"),
     # swoole 6.1 branch
     ("swoole", "v6.1.7", "8.1", "8.4"),
     # swoole 6.0 branch
     ("swoole", "v6.0.2", "8.1", "8.4"),
     # swoole 5.1 branch
     ("swoole", "v5.1.8", "8.0", "8.3"),
+    # swoole 5.0 branch
+    ("swoole", "v5.0.3", "8.0", "8.2"),
     # swoole 4.8 branch
     ("swoole", "v4.8.13", "8.0", "8.2"),
     # swow ci branch
@@ -73,7 +77,13 @@ for phpVer, alpineVer in phpAlpineVersions.items():
             extDev = f"libpq-dev curl-dev openssl-dev"
         else:
             raise Exception(f"not implemented: {ext}")
-        tag = f"{phpVer}-alpine-{alpineVer}-{ext}-{extraExtTag}"
+        if extRef == "master":
+            extVer = "master"
+        elif extRef == "ci":
+            extVer = "ci"
+        else:
+            extVer = extRef.removeprefix("v")
+        tag = f"{phpVer}-alpine-{alpineVer}-{ext}-{extVer}-{extraExtTag}"
 
         task = {}
         task["args"] = "\n".join([
