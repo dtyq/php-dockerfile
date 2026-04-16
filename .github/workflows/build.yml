@@ -38,7 +38,7 @@ jobs:
     strategy:
       matrix:
         tasks: ${{ fromJson(needs.prepare.outputs.tasks) }}
-      max-parallel: 5
+      max-parallel: 18
       fail-fast: false
     permissions:
       contents: write
