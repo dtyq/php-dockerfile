@@ -15,9 +15,9 @@ extVersions = [
     # swoole master branch
     ("swoole", "master", "8.2", "8.5"),
     # swoole 6.2 branch
-    ("swoole", "v6.2.0", "8.2", "8.5"),
+    ("swoole", "v6.2.2", "8.2", "8.5"),
     # swoole 6.1 branch
-    ("swoole", "v6.1.7", "8.1", "8.4"),
+    ("swoole", "v6.1.8", "8.1", "8.4"),
     # swoole 6.0 branch
     ("swoole", "v6.0.2", "8.1", "8.4"),
     # swoole 5.1 branch
