@@ -4,9 +4,9 @@ import urllib.request
 from packaging.version import parse as parse_version
 
 phpAlpineVersions = {
-    "8.5": "3.23",
-    "8.4": "3.23",
-    "8.3": "3.23",
+    "8.5": "3.24",
+    "8.4": "3.24",
+    "8.3": "3.24",
     "8.2": "3.22",
     "8.1": "3.18",
 }
@@ -27,7 +27,7 @@ extVersions = [
     # swoole 4.8 branch
     ("swoole", "v4.8.13", "8.0", "8.2"),
     # swow ci branch
-    ("swow", "ci", "8.0", None),
+    ("swow", "ci", "8.1", None),
     # swow
     ("swow", "v1.6.2", "8.0", "8.5"),
 ]
