@@ -148,6 +148,7 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var
         gcc \
         g++ \
         libc-dev \
+        linux-headers \
         make \
         pkgconf \
         re2c \
