@@ -9,15 +9,7 @@ The alpine branch is for building images based on alpine.
 ### Tag naming convention
 
 ```plain
-<php version, must be major.minor>-alpine-<alpine version, must be major.minor>-swoole-<swoole version, must be major.minor.revision>[-extensions,-extensions]
-```
-
-Extension names must be sorted alphabetically (to ensure uniqueness)
-
-For example:
-
-```plain
-8.1-alpine-3.16-swoole-5.0.2-jsonpath-xlswriter
+<php version, must be major.minor>-alpine-<alpine version, must be major.minor>-swoole-<swoole version, must be major.minor.revision>
 ```
 
 ### debuggable tag

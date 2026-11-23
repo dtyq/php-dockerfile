@@ -9,15 +9,7 @@ alpine分支用于构建基于alpine的镜像
 ### tag命名约定
 
 ```plain
-<php版本号，必须是主版本号.小版本号>-alpine-<alpine版本号，必须是主版本号.子版本号>-swoole-<swoole版本号，必须是主版本号.子版本号.修订版本号>[-扩展们,-扩展们]
-```
-
-扩展名必须按字母表排序（为了保证唯一性）
-
-例如
-
-```plain
-8.1-alpine-3.16-swoole-5.0.2-jsonpath-xlswriter
+<php版本号，必须是主版本号.小版本号>-alpine-<alpine版本号，必须是主版本号.子版本号>-swoole-<swoole版本号，必须是主版本号.子版本号.修订版本号>
 ```
 
 ### debuggable tag
