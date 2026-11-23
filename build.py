@@ -5,12 +5,12 @@ import sys
 import re
 import subprocess
 import socket
-import urllib.request
-import json
 import argparse
 
+from misc import alpinePHPPackageSuffix, getHEADRev
+
 tagRe = re.compile(
-    r"^(?P<phpver>\d\.\d)-alpine-(?P<alpinever>(?:\d\.\d+|edge))-(?P<ext>swow|swoole)-(?P<extver>\d+\.\d+\.\d+(?:-alpha(?:\.\d+)*)*(?:-nightly\d+)*|ci|master)(?P<exts>(?:-[^-]+)*)$"
+    r"^(?P<phpver>\d\.\d)-alpine-(?P<alpinever>(?:\d\.\d+|edge))-(?P<ext>swow|swoole)-(?P<extver>\d+\.\d+\.\d+(?:-alpha(?:\.\d+)*)*(?:-nightly\d+)*|ci|master)$"
 )
 
 tryMirrors = os.environ.get(
@@ -19,28 +19,6 @@ tryMirrors = os.environ.get(
 
 
 publicMirror = os.environ.get("PUBLIC_MIRROR", "https://mirrors.ustc.edu.cn")
-
-
-def getHEADRev(repo: str, branch: str) -> str:
-    url = f"https://api.github.com/repos/{repo}/commits/{branch}"
-    with urllib.request.urlopen(
-        urllib.request.Request(
-            url,
-            headers={
-                **(
-                    {
-                        "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
-                    }
-                    if os.environ.get("GITHUB_TOKEN")
-                    else {}
-                ),
-                "Accept": "application/json",
-                "User-Agent": "php-dockerfile/1.0",
-            },
-        )
-    ) as response:
-        data = json.loads(response.read().decode())
-        return data["sha"]
 
 
 def mian():
@@ -61,17 +39,6 @@ def mian():
         raise Exception(f"错误的tag格式")
 
     groups = match.groupdict()
-    if groups["exts"]:
-        sortedExts = "-" + "-".join(
-            sorted(filter(lambda x: bool(x), groups["exts"].split("-")))
-        )
-        if sortedExts != groups["exts"]:
-            raise Exception(f"附加扩展们没有按照字母表排序，应更改为{sortedExts}")
-
-    for ext in filter(lambda x: bool(x), groups["exts"].split("-")):
-        if not os.path.isfile(f"exts/{ext}.sh"):
-            raise Exception(f"不支持的附加扩展{ext}，联系这个仓库的维护者")
-
     if groups["ext"] == "swoole":
         if groups["extver"] == "ci":
             raise Exception("swoole不使用ci分支")
@@ -124,14 +91,6 @@ def mian():
         else:
             fullTagArgs.append(f"{imageName}:{tag}")
 
-    if groups["exts"]:
-        extsBuildArg = (
-            "--build-arg",
-            f"EXTS={groups['exts']}",
-        )
-    else:
-        extsBuildArg = ()
-
     if os.getenv("CI"):
         print("##[group]", end="")
     print("构建无符号（镜像比较小，生产用）版本")
@@ -154,6 +113,8 @@ def mian():
         "--build-arg",
         f"PHP_VERSION={groups['phpver']}",
         "--build-arg",
+        f"ALPINE_PHP_PACKAGE_SUFFIX={alpinePHPPackageSuffix(groups['alpinever'], groups['phpver'])}",
+        "--build-arg",
         f"EXT_URL={extUrl}",
         "--build-arg",
         f"EXT_REV={extRev}",
@@ -163,7 +124,6 @@ def mian():
         f"MIRROR={mirror}",
         "--build-arg",
         f"CURL_PROXY={proxy}",
-        *extsBuildArg,
         ".",
     ]
     print(cmd)
@@ -205,6 +165,8 @@ def mian():
         "--build-arg",
         f"PHP_VERSION={groups['phpver']}",
         "--build-arg",
+        f"ALPINE_PHP_PACKAGE_SUFFIX={alpinePHPPackageSuffix(groups['alpinever'], groups['phpver'])}",
+        "--build-arg",
         f"EXT_URL={extUrl}",
         "--build-arg",
         f"EXT_REV={extRev}",
@@ -214,7 +176,6 @@ def mian():
         f"MIRROR={mirror}",
         "--build-arg",
         f"CURL_PROXY={proxy}",
-        *extsBuildArg,
         ".",
     ]
     print(cmd)

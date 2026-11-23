@@ -8,6 +8,7 @@ FROM public.ecr.aws/docker/library/alpine:$ALPINE_VERSION AS php_base
 
 ARG ALPINE_VERSION
 ARG PHP_VERSION
+ARG ALPINE_PHP_PACKAGE_SUFFIX
 ARG EXT_DEV
 ARG MIRROR
 ARG CURL_PROXY
@@ -28,19 +29,11 @@ ENV LD_PRELOAD=/usr/lib/libmimalloc.so.2
 
 RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var/cache/apk \
     set -eo pipefail ; \
+    # Backup and setup mirror for alpine packages
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
-    # setup suffix
-    case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.5-edge"|"8.5-3.24"|"8.5-3.23") suffix=85;; \
-        "8.4-edge"|"8.4-3.24"|"8.4-3.23"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
-        "8.3-edge"|"8.3-3.24"|"8.3-3.23"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
-        "8.2-edge"|"8.2-3.22"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
-        "8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
-        "8.0-3.16"|"8.0-3.15") suffix=8;; \
-        "7.4-3.15") suffix=7;; \
-        *) echo "not supported php ${PHP_VERSION} on alpine ${ALPINE_VERSION}"; exit 1;; \
-    esac ; \
+    # Install php and extensions
+    suffix="${ALPINE_PHP_PACKAGE_SUFFIX}" ; \
     DEPS="$(echo "${EXT_DEV}" | sed 's/-dev//g')" ; \
     OPCACHE="$([ "${PHP_VERSION}" != "8.5" ] && echo php${suffix}-opcache~${PHP_VERSION} || : )" ; \
     apk update && \
@@ -116,6 +109,7 @@ FROM php_base AS ext_builder
 
 ARG ALPINE_VERSION
 ARG PHP_VERSION
+ARG ALPINE_PHP_PACKAGE_SUFFIX
 ARG MIRROR
 ARG EXT_URL
 ARG EXT_DEV
@@ -128,17 +122,7 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var
     set -eo pipefail; \
     cp /etc/apk/repositories /etc/apk/repositories.orig && \
     sed -i "s|https://dl-cdn.alpinelinux.org|${MIRROR}|g" /etc/apk/repositories && \
-    # setup suffix
-    case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.5-edge"|"8.5-3.24"|"8.5-3.23") suffix=85;; \
-        "8.4-edge"|"8.4-3.24"|"8.4-3.23"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
-        "8.3-edge"|"8.3-3.24"|"8.3-3.23"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
-        "8.2-edge"|"8.2-3.22"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
-        "8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
-        "8.0-3.16"|"8.0-3.15") suffix=8;; \
-        "7.4-3.15") suffix=7;; \
-        *) echo "not supported php ${PHP_VERSION} on alpine ${ALPINE_VERSION}"; exit 1;; \
-    esac ; \
+    suffix="${ALPINE_PHP_PACKAGE_SUFFIX}" ; \
     # build time dependencies
     apk update && \
     apk add --virtual .build-deps \
@@ -255,7 +239,7 @@ FROM ext_builder AS exts_builder
 
 ARG ALPINE_VERSION
 ARG PHP_VERSION
-ARG EXTS
+ARG ALPINE_PHP_PACKAGE_SUFFIX
 
 ARG TARGETARCH
 
@@ -263,24 +247,10 @@ COPY exts /usr/src/exts/
 
 RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var/cache/apk \
     set -eo pipefail && \
-    # setup suffix
-    case "${PHP_VERSION}-${ALPINE_VERSION}" in \
-        "8.5-edge"|"8.5-3.24"|"8.5-3.23") suffix=85;; \
-        "8.4-edge"|"8.4-3.24"|"8.4-3.23"|"8.4-3.22"|"8.4-3.21") suffix=84;; \
-        "8.3-edge"|"8.3-3.24"|"8.3-3.23"|"8.3-3.22"|"8.3-3.21"|"8.3-3.20"|"8.3-3.19") suffix=83;; \
-        "8.2-edge"|"8.2-3.22"|"8.2-3.21"|"8.2-3.20"|"8.2-3.19"|"8.2-3.18") suffix=82;; \
-        "8.1-3.18"|"8.1-3.17"|"8.1-3.16") suffix=81;; \
-        "8.0-3.16"|"8.0-3.15") suffix=8;; \
-        "7.4-3.15") suffix=7;; \
-        *) echo "not supported php ${PHP_VERSION} on alpine ${ALPINE_VERSION}"; exit 1;; \
-    esac ; \
-    export suffix ; \
-    _IFS="$IFS" ; \
-    IFS="-" ; \
-    for ext in $EXTS ; \
+    export suffix="${ALPINE_PHP_PACKAGE_SUFFIX}" ; \
+    for extscr in $(ls /usr/src/exts/*.sh | sort) ; \
     do \
-        [ "x${ext}" = "x" ] && continue ; \
-        IFS="$_IFS" "/usr/src/exts/${ext}.sh" ; \
+        "$extscr"; \
     done
 
 FROM php_base AS stripped

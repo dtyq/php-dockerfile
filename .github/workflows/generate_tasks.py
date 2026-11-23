@@ -1,7 +1,8 @@
 import os
 import json
-import urllib.request
 from packaging.version import parse as parse_version
+
+from misc import alpinePHPPackageSuffix, getHEADRev
 
 phpAlpineVersions = {
     "8.5": "3.24",
@@ -32,29 +33,6 @@ extVersions = [
     ("swow", "v2.0.0", "8.1", "8.6"),
 ]
 
-extraExts = [
-    "jsonpath",
-    "parle",
-    "xlswriter",
-]
-extraExtTag = "-".join(sorted(extraExts))
-
-
-def getHEADRev(repo: str, ref: str) -> str:
-    url = f"https://api.github.com/repos/{repo}/commits/{ref}"
-    with urllib.request.urlopen(
-        urllib.request.Request(
-            url,
-            headers={
-                "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
-                "Accept": "application/json",
-                "User-Agent": "php-dockerfile/1.0",
-            },
-        )
-    ) as response:
-        data = json.loads(response.read().decode())
-        return data["sha"]
-
 
 githubOutput = open(os.environ["GITHUB_OUTPUT"], "w")
 
@@ -83,18 +61,20 @@ for phpVer, alpineVer in phpAlpineVersions.items():
             extVer = "ci"
         else:
             extVer = extRef.removeprefix("v")
-        tag = f"{phpVer}-alpine-{alpineVer}-{ext}-{extVer}-{extraExtTag}"
+        tag = f"{phpVer}-alpine-{alpineVer}-{ext}-{extVer}"
 
         task = {}
-        task["args"] = "\n".join([
-            f"ALPINE_VERSION={alpineVer}",
-            f"PHP_VERSION={phpVer}",
-            f"EXT_URL={extUrl}",
-            f"EXT_REV={extRev}",
-            f"EXT_DEV={extDev}",
-            f"EXTS=-{extraExtTag}",
-            f"MIRROR={os.environ['PUBLIC_MIRROR']}",
-        ])
+        task["args"] = "\n".join(
+            [
+                f"ALPINE_VERSION={alpineVer}",
+                f"PHP_VERSION={phpVer}",
+                f"ALPINE_PHP_PACKAGE_SUFFIX={alpinePHPPackageSuffix(alpineVer, phpVer)}",
+                f"EXT_URL={extUrl}",
+                f"EXT_REV={extRev}",
+                f"EXT_DEV={extDev}",
+                f"MIRROR={os.environ['PUBLIC_MIRROR']}",
+            ]
+        )
         task["tag"] = tag
         if parse_version(alpineVer) >= parse_version("3.22"):
             task["platforms"] = f"linux/amd64,linux/arm64,linux/riscv64"
