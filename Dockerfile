@@ -93,6 +93,7 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var
         php${suffix}-pecl-mongodb \
         php${suffix}-pecl-yaml \
         php${suffix}-pecl-zstd \
+        php${suffix}-pecl-xlswriter \
     && \
     ln -sf /usr/bin/php${suffix} /usr/bin/php && \
     rm -rf /var/cache/apk/* /tmp/* && \
