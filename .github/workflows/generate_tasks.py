@@ -13,11 +13,11 @@ phpAlpineVersions = {
 
 extVersions = [
     # swoole master branch
-    ("swoole", "master", "8.2", "8.5"),
+    ("swoole", "master", "8.2", "8.6"),
     # swoole 6.2 branch
-    ("swoole", "v6.2.2", "8.2", "8.5"),
+    ("swoole", "v6.2.6", "8.2", "8.5"),
     # swoole 6.1 branch
-    ("swoole", "v6.1.8", "8.1", "8.4"),
+    ("swoole", "v6.1.13", "8.1", "8.4"),
     # swoole 6.0 branch
     ("swoole", "v6.0.2", "8.1", "8.4"),
     # swoole 5.1 branch
@@ -29,7 +29,7 @@ extVersions = [
     # swow ci branch
     ("swow", "ci", "8.1", None),
     # swow
-    ("swow", "v1.6.2", "8.0", "8.5"),
+    ("swow", "v2.0.0", "8.1", "8.6"),
 ]
 
 extraExts = [
