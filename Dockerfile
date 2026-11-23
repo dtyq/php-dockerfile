@@ -163,7 +163,9 @@ RUN --mount=type=cache,id=alpine-apk-${ALPINE_VERSION}-${TARGETARCH},target=/var
         ./configure \
             --with-php-config=/usr/bin/php-config${suffix} \
             --enable-swow-curl \
-            --enable-swow-ssl && \
+            --enable-swow-ssl \
+            --enable-swow-pdo-pgsql \
+            --enable-swow-mongodb && \
         echo "extension=${EXT}.so" > /tmp/50_${EXT}.ini ; \
     else \
         phpize${suffix} && \
